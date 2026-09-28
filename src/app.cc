@@ -5,6 +5,8 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
+#include "ui/profiler_ui.hpp"
+
 int main()
 {
     if (!glfwInit()) {
@@ -39,6 +41,8 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
+    hemlok::ui::ProfilerUi profiler_ui;
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -46,9 +50,7 @@ int main()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::Begin("Sampling Profiler");
-        ImGui::TextUnformatted("Hemlok is ready.");
-        ImGui::End();
+        profiler_ui.Draw();
 
         ImGui::Render();
         int framebuffer_width = 0;
@@ -69,4 +71,3 @@ int main()
     glfwTerminate();
     return EXIT_SUCCESS;
 }
-
