@@ -48,7 +48,7 @@ target_include_directories(imgui PUBLIC
 
 target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
 
-add_executable(hemlok src/app.cpp)
+add_executable(hemlok src/app.cc)
 target_link_libraries(hemlok PRIVATE imgui)
 
 if(APPLE)
