@@ -4,7 +4,11 @@
 
 namespace hemlok::ui {
     void ProfilerUi::Draw() {
-        ImGui::Begin("Hemlok");
+        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->WorkPos);
+        ImGui::SetNextWindowSize(viewport->WorkSize);
+        ImGui::Begin("Hemlok", nullptr, ImGuiWindowFlags_NoDecoration |
+                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
 
         ImGui::InputText("Executable path", executable_path_.data(),
                 executable_path_.size());
