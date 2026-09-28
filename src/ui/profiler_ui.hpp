@@ -8,18 +8,17 @@
 #include <vector>
 
 namespace hemlok::ui {
+    class ProfilerUi {
+        public:
+            void Draw();
 
-class ProfilerUi {
- public:
-  void Draw();
+        private:
+            static constexpr std::size_t kPathCapacity = 1024;
 
- private:
-  static constexpr std::size_t kPathCapacity = 1024;
-
-  std::array<char, kPathCapacity> executable_path_{};
-  std::vector<std::string> targets_;
-  std::optional<std::size_t> selected_target_;
-};
+            std::array<char, kPathCapacity> executable_path_{};
+            std::vector<std::string> targets_;
+            std::optional<std::size_t> selected_target_;
+    };
 
 }  // namespace hemlok::ui
 
