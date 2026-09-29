@@ -53,7 +53,10 @@ file(GLOB_RECURSE HEMLOK_SOURCES CONFIGURE_DEPENDS
 )
 
 add_executable(hemlok ${HEMLOK_SOURCES})
-target_include_directories(hemlok PRIVATE src)
+target_include_directories(hemlok PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/include"
+)
 target_link_libraries(hemlok PRIVATE imgui)
 
 if(APPLE)
