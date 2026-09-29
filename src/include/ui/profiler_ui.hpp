@@ -26,6 +26,7 @@ namespace hemlok::ui {
             // UI state
             std::array<char, kNameCapacity> target_name_{};
             std::array<char, kPathCapacity> executable_path_{};
+            bool invalid_path_ = false;
             std::optional<profiler::TargetId> selected_target_;
 
             // App state

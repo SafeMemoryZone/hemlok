@@ -1,8 +1,10 @@
 #include <ui/profiler_ui.hpp>
 
 #include <cstdlib>
+#include <filesystem>
 #include <optional>
 #include <string>
+#include <system_error>
 #include <utility>
 
 #include <GLFW/glfw3.h>
@@ -98,22 +100,39 @@ namespace hemlok::ui {
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("Optional");
             }
-            ImGui::InputText("Executable path", executable_path_.data(),
-                    executable_path_.size());
+            if (ImGui::InputText("Executable path", executable_path_.data(),
+                        executable_path_.size())) {
+                invalid_path_ = false;
+            }
+            if (invalid_path_) {
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(1.0F, 0.3F, 0.3F, 1.0F),
+                        "Invalid path");
+            }
 
             if (ImGui::Button("Add")) {
-                std::optional<std::string> name;
-                if (target_name_[0] != '\0') {
-                    name.emplace(target_name_.data());
+                std::filesystem::path executable_path(
+                        executable_path_.data());
+                std::error_code error;
+                if (!std::filesystem::is_regular_file(executable_path, error)) {
+                    invalid_path_ = true;
                 }
-                profiler_.addProfilingTarget(profiler::ProfilingTarget{
-                        std::move(name), executable_path_.data()});
-                target_name_.fill('\0');
-                executable_path_.fill('\0');
-                ImGui::CloseCurrentPopup();
+                else {
+                    std::optional<std::string> name;
+                    if (target_name_[0] != '\0') {
+                        name.emplace(target_name_.data());
+                    }
+                    profiler_.addProfilingTarget(profiler::ProfilingTarget{
+                            std::move(name), std::move(executable_path)});
+                    target_name_.fill('\0');
+                    executable_path_.fill('\0');
+                    invalid_path_ = false;
+                    ImGui::CloseCurrentPopup();
+                }
             }
             ImGui::SameLine();
             if (ImGui::Button("Cancel")) {
+                invalid_path_ = false;
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
