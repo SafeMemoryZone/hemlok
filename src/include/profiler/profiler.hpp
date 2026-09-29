@@ -6,19 +6,19 @@
 #include <unordered_map>
 
 namespace hemlok::profiler {
-    using TargetId = std::uint64_t;
+using TargetId = std::uint64_t;
 
-    class Profiler {
-    public:
-        Profiler() = default;
+class Profiler {
+public:
+    Profiler() = default;
 
-        void addProfilingTarget(ProfilingTarget target);
-        const std::unordered_map<TargetId, ProfilingTarget>& getTargets() const;
+    void addProfilingTarget(ProfilingTarget target);
+    const std::unordered_map<TargetId, ProfilingTarget>& getTargets() const;
 
-    private:
-        TargetId next_target_id_ = 0;
-        std::unordered_map<TargetId, ProfilingTarget> targets_;
-    };
-} // namespace hemlok::profiler
+private:
+    TargetId next_target_id_ = 0;
+    std::unordered_map<TargetId, ProfilingTarget> targets_;
+};
+}  // namespace hemlok::profiler
 
-#endif // HEMLOK_PROFILER_PROFILER_HPP_
+#endif  // HEMLOK_PROFILER_PROFILER_HPP_
