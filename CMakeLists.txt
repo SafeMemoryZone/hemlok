@@ -48,7 +48,15 @@ target_include_directories(imgui PUBLIC
 
 target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
 
-add_executable(hemlok src/app.cpp)
+file(GLOB_RECURSE HEMLOK_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
+)
+
+add_executable(hemlok ${HEMLOK_SOURCES})
+target_include_directories(hemlok PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/include"
+)
 target_link_libraries(hemlok PRIVATE imgui)
 
 if(APPLE)
