@@ -2,6 +2,8 @@
 
 #include <cstdlib>
 #include <optional>
+#include <string>
+#include <utility>
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -84,20 +86,45 @@ namespace hemlok::ui {
         ImGui::Begin("Hemlok", nullptr, ImGuiWindowFlags_NoDecoration |
                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
 
-        ImGui::InputText("Executable path", executable_path_.data(),
-                executable_path_.size());
-        ImGui::SameLine();
-        if (ImGui::Button("Add target") && executable_path_[0] != '\0') {
-            profiler_.addProfilingTarget(profiler::ProfilingTarget{
-                    std::nullopt, executable_path_.data()});
-            executable_path_.fill('\0');
+        if (ImGui::Button("Add target", ImVec2(160.0F, 40.0F))) {
+            ImGui::OpenPopup("Add target");
+        }
+
+        if (ImGui::BeginPopupModal("Add target", nullptr,
+                    ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::InputText("Name", target_name_.data(), target_name_.size());
+            ImGui::SameLine();
+            ImGui::TextDisabled("(?)");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Optional");
+            }
+            ImGui::InputText("Executable path", executable_path_.data(),
+                    executable_path_.size());
+
+            if (ImGui::Button("Add")) {
+                std::optional<std::string> name;
+                if (target_name_[0] != '\0') {
+                    name.emplace(target_name_.data());
+                }
+                profiler_.addProfilingTarget(profiler::ProfilingTarget{
+                        std::move(name), executable_path_.data()});
+                target_name_.fill('\0');
+                executable_path_.fill('\0');
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel")) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
         }
 
         ImGui::Separator();
         ImGui::BeginChild("Targets", ImVec2(240.0F, 0.0F), true);
         for (const auto& [target_id, target] : profiler_.getTargets()) {
             const bool is_selected = selected_target_ == target_id;
-            const auto label = target.executable_path.string();
+            const std::string label = target.name.value_or(
+                    target.executable_path.string());
 
             ImGui::PushID(static_cast<int>(target_id));
             if (ImGui::Selectable(label.c_str(), is_selected)) {

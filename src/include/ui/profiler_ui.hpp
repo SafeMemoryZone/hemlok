@@ -16,6 +16,7 @@ namespace hemlok::ui {
             int Start();
 
         private:
+            static constexpr std::size_t kNameCapacity = 256;
             static constexpr std::size_t kPathCapacity = 1024;
 
             bool Init();
@@ -23,6 +24,7 @@ namespace hemlok::ui {
             void Shutdown();
 
             // UI state
+            std::array<char, kNameCapacity> target_name_{};
             std::array<char, kPathCapacity> executable_path_{};
             std::optional<profiler::TargetId> selected_target_;
 
