@@ -22,13 +22,13 @@ bool ProfilerUi::Init() {
     }
 
 #if defined(__APPLE__)
-    constexpr auto glsl_version = "#version 150";
+    constexpr auto kGlslVersion = "#version 150";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 #else
-    constexpr auto glsl_version = "#version 130";
+    constexpr auto kGlslVersion = "#version 130";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 #endif
@@ -46,7 +46,7 @@ bool ProfilerUi::Init() {
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window_, true);
-    ImGui_ImplOpenGL3_Init(glsl_version);
+    ImGui_ImplOpenGL3_Init(kGlslVersion);
     return true;
 }
 
@@ -119,7 +119,7 @@ void ProfilerUi::Draw() {
                 if (target_name_[0] != '\0') {
                     name.emplace(target_name_.data());
                 }
-                profiler_.addProfilingTarget(profiler::ProfilingTarget{
+                profiler_.AddProfilingTarget(profiler::ProfilingTarget{
                     std::move(name), std::move(executable_path)});
                 target_name_.fill('\0');
                 executable_path_.fill('\0');
@@ -137,7 +137,7 @@ void ProfilerUi::Draw() {
 
     ImGui::Separator();
     ImGui::BeginChild("Targets", ImVec2(240.0F, 0.0F), true);
-    for (const auto& [target_id, target] : profiler_.getTargets()) {
+    for (const auto& [target_id, target] : profiler_.GetTargets()) {
         const bool is_selected = selected_target_ == target_id;
         const std::string label =
             target.name.value_or(target.executable_path.string());

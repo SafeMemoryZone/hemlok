@@ -1,5 +1,5 @@
-#ifndef HEMLOK_PROCESS_PROCESS_
-#define HEMLOK_PROCESS_PROCESS_
+#ifndef HEMLOK_PROCESS_PROCESS_HPP_
+#define HEMLOK_PROCESS_PROCESS_HPP_
 
 #include <boost/process/v2/process.hpp>
 #include <expected>
@@ -21,9 +21,9 @@ enum class ProcessError {
 class Process {
 public:
     [[nodiscard]] static std::expected<Process, ProcessError>
-    startProcessFromExecutable(std::filesystem::path path);
+    StartProcessFromExecutable(std::filesystem::path path);
 
-    [[nodiscard]] std::expected<void, ProcessError> terminate();
+    [[nodiscard]] std::expected<void, ProcessError> Terminate();
 
 private:
     explicit Process(std::filesystem::path path,
@@ -40,4 +40,4 @@ private:
 };
 }  // namespace hemlok::process
 
-#endif  // HEMLOK_PROCESS_PROCESS_
+#endif  // HEMLOK_PROCESS_PROCESS_HPP_

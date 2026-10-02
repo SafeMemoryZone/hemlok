@@ -11,16 +11,16 @@ using hemlok::profiler::ProfilingTarget;
 TEST_CASE("a new profiler has no targets", "[profiler]") {
     const Profiler profiler;
 
-    REQUIRE(profiler.getTargets().empty());
+    REQUIRE(profiler.GetTargets().empty());
 }
 
 TEST_CASE("a profiler stores a named target", "[profiler]") {
     Profiler profiler;
     const std::filesystem::path executable_path = "/usr/bin/example";
 
-    profiler.addProfilingTarget(ProfilingTarget{"example", executable_path});
+    profiler.AddProfilingTarget(ProfilingTarget{"example", executable_path});
 
-    const auto& targets = profiler.getTargets();
+    const auto& targets = profiler.GetTargets();
     REQUIRE(targets.size() == 1);
     REQUIRE(targets.contains(0));
     REQUIRE(targets.at(0).name == std::optional<std::string>{"example"});
@@ -30,10 +30,10 @@ TEST_CASE("a profiler stores a named target", "[profiler]") {
 TEST_CASE("a profiler stores a target without a name", "[profiler]") {
     Profiler profiler;
 
-    profiler.addProfilingTarget(
+    profiler.AddProfilingTarget(
         ProfilingTarget{std::nullopt, "/usr/bin/unnamed"});
 
-    const auto& target = profiler.getTargets().at(0);
+    const auto& target = profiler.GetTargets().at(0);
     REQUIRE_FALSE(target.name.has_value());
     REQUIRE(target.executable_path == "/usr/bin/unnamed");
 }
@@ -41,11 +41,11 @@ TEST_CASE("a profiler stores a target without a name", "[profiler]") {
 TEST_CASE("a profiler assigns consecutive target IDs", "[profiler]") {
     Profiler profiler;
 
-    profiler.addProfilingTarget(ProfilingTarget{"first", "/bin/first"});
-    profiler.addProfilingTarget(ProfilingTarget{"second", "/bin/second"});
-    profiler.addProfilingTarget(ProfilingTarget{"third", "/bin/third"});
+    profiler.AddProfilingTarget(ProfilingTarget{"first", "/bin/first"});
+    profiler.AddProfilingTarget(ProfilingTarget{"second", "/bin/second"});
+    profiler.AddProfilingTarget(ProfilingTarget{"third", "/bin/third"});
 
-    const auto& targets = profiler.getTargets();
+    const auto& targets = profiler.GetTargets();
     REQUIRE(targets.size() == 3);
     REQUIRE(targets.at(0).name == std::optional<std::string>{"first"});
     REQUIRE(targets.at(1).name == std::optional<std::string>{"second"});
@@ -55,9 +55,9 @@ TEST_CASE("a profiler assigns consecutive target IDs", "[profiler]") {
 TEST_CASE("existing target references observe newly added targets",
           "[profiler]") {
     Profiler profiler;
-    const auto& targets = profiler.getTargets();
+    const auto& targets = profiler.GetTargets();
 
-    profiler.addProfilingTarget(ProfilingTarget{"later", "/bin/later"});
+    profiler.AddProfilingTarget(ProfilingTarget{"later", "/bin/later"});
 
     REQUIRE(targets.size() == 1);
     REQUIRE(targets.at(0).name == std::optional<std::string>{"later"});

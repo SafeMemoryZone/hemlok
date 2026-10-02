@@ -26,29 +26,29 @@ TEST_CASE("starting a missing executable returns a file-not-found error",
             std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH} / "child";
     }
 
-    const auto result = Process::startProcessFromExecutable(missing_executable);
+    const auto result = Process::StartProcessFromExecutable(missing_executable);
     REQUIRE_FALSE(result.has_value());
     REQUIRE(result.error() == ProcessError::kFileNotFound);
 }
 
 TEST_CASE("a running process can be terminated", "[process]") {
-    auto process = Process::startProcessFromExecutable(
+    auto process = Process::StartProcessFromExecutable(
         std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
 
     REQUIRE(process.has_value());
     SECTION("terminate through the expected result") {
-        REQUIRE(process->terminate().has_value());
+        REQUIRE(process->Terminate().has_value());
     }
     SECTION("move the process value") {
         Process owned_process = std::move(*process);
-        REQUIRE(owned_process.terminate().has_value());
+        REQUIRE(owned_process.Terminate().has_value());
     }
     SECTION("move-assign over another running process") {
-        auto other = Process::startProcessFromExecutable(
+        auto other = Process::StartProcessFromExecutable(
             std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
         REQUIRE(other.has_value());
         *other = std::move(*process);
-        REQUIRE(other->terminate().has_value());
+        REQUIRE(other->Terminate().has_value());
     }
 }
 }  // namespace

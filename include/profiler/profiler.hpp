@@ -12,8 +12,8 @@ class Profiler {
 public:
     Profiler() = default;
 
-    void addProfilingTarget(ProfilingTarget target);
-    const std::unordered_map<TargetId, ProfilingTarget>& getTargets() const;
+    void AddProfilingTarget(ProfilingTarget target);
+    const std::unordered_map<TargetId, ProfilingTarget>& GetTargets() const;
 
 private:
     TargetId next_target_id_ = 0;

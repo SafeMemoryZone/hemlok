@@ -3,7 +3,7 @@
 #include <vector>
 
 namespace hemlok::process {
-std::expected<Process, ProcessError> Process::startProcessFromExecutable(
+std::expected<Process, ProcessError> Process::StartProcessFromExecutable(
     std::filesystem::path path) {
     boost::system::error_code error;
     Process process(path, error);
@@ -32,7 +32,7 @@ Process::Process(std::filesystem::path path, boost::system::error_code& error)
         std::vector<std::string>{});
 }
 
-std::expected<void, ProcessError> Process::terminate() {
+std::expected<void, ProcessError> Process::Terminate() {
     boost::system::error_code error;
     state_->process.terminate(error);
     if (error) {

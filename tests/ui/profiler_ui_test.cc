@@ -11,6 +11,6 @@ TEST_CASE("constructing the profiler UI does not change profiler state",
     Profiler profiler;
 
     REQUIRE_NOTHROW(ProfilerUi{profiler});
-    REQUIRE(profiler.getTargets().empty());
+    REQUIRE(profiler.GetTargets().empty());
 }
 }  // namespace
