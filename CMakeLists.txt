@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(HEMLOK_BUILD_TESTS "Build the Hemlok test suite" ON)
+
 include(FetchContent)
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
@@ -40,6 +42,16 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(glfw imgui Boost)
+
+if(HEMLOK_BUILD_TESTS)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.15.3
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(Catch2)
+endif()
 
 find_package(OpenGL REQUIRED)
 
@@ -83,4 +95,9 @@ target_link_libraries(hemlok PRIVATE hemlok_lib)
 
 if(APPLE)
     target_compile_definitions(hemlok_lib PRIVATE GL_SILENCE_DEPRECATION)
+endif()
+
+if(HEMLOK_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
