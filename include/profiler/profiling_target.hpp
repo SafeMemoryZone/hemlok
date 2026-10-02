@@ -7,6 +7,7 @@
 #include <utility>
 
 namespace hemlok::profiler {
+// WARNING: ProfilingTarget does not guarantee a valid name or executable_path.
 struct ProfilingTarget {
     ProfilingTarget(std::optional<std::string> name,
                     std::filesystem::path executable_path)
