@@ -3,6 +3,7 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <optional>
@@ -164,11 +165,67 @@ void ProfilerUi::Draw() {
     ImGui::EndChild();
 
     if (selected_target_.has_value()) {
-        ImGui::SameLine();
-        ImGui::TextUnformatted("Profiler details will appear here.");
+        const auto& targets = profiler_.GetTargets();
+        const auto target = targets.find(*selected_target_);
+        if (target != targets.end()) {
+            ImGui::SameLine();
+            if (ImGui::BeginChild("Target details")) {
+                DrawTargetDetails(target->second);
+            }
+            ImGui::EndChild();
+        }
     }
 
     ImGui::End();
+}
+
+void ProfilerUi::DrawTargetDetails(const profiler::ProfilingTarget& target) {
+    const ImGuiStyle& style = ImGui::GetStyle();
+
+    ImGui::PushTextWrapPos(0.0F);
+    if (target.name.has_value()) {
+        ImGui::TextDisabled("Name");
+        ImGui::TextUnformatted(target.name->c_str());
+        ImGui::Spacing();
+    }
+    ImGui::TextDisabled("Executable");
+    ImGui::TextUnformatted(target.executable_path.string().c_str());
+    ImGui::PopTextWrapPos();
+
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    constexpr const char* kButtonLabel = "Start profiling";
+    constexpr const char* kHelpText =
+        "Profile this target to start collecting performance data.";
+    const ImVec2 origin = ImGui::GetCursorPos();
+    const ImVec2 available = ImGui::GetContentRegionAvail();
+    const float width = std::max(1.0F, available.x);
+    const float wrap_width = std::min(width, ImGui::GetFontSize() * 26.0F);
+    const ImVec2 help_size =
+        ImGui::CalcTextSize(kHelpText, nullptr, false, wrap_width);
+    const ImVec2 button_size(
+        std::min(width, ImGui::CalcTextSize(kButtonLabel).x +
+                            style.FramePadding.x * 6.0F),
+        ImGui::GetFrameHeight() + style.FramePadding.y * 2.0F);
+    const float content_height =
+        button_size.y + style.ItemSpacing.y * 2.0F + help_size.y;
+    const float content_top =
+        origin.y + std::max(0.0F, (available.y - content_height) * 0.5F);
+
+    ImGui::SetCursorPos(
+        ImVec2(origin.x + (width - button_size.x) * 0.5F, content_top));
+    // Profiling will be wired up when the backend supports starting a session.
+    ImGui::Button(kButtonLabel, button_size);
+
+    ImGui::SetCursorPos(
+        ImVec2(origin.x + (width - help_size.x) * 0.5F,
+               content_top + button_size.y + style.ItemSpacing.y * 2.0F));
+    ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap_width);
+    ImGui::TextUnformatted(kHelpText);
+    ImGui::PopTextWrapPos();
+    ImGui::PopStyleColor();
 }
 
 void ProfilerUi::Shutdown() {

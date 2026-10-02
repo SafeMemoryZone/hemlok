@@ -21,6 +21,7 @@ private:
 
     bool Init();
     void Draw();
+    void DrawTargetDetails(const profiler::ProfilingTarget& target);
     void Shutdown();
 
     // UI state
