@@ -59,17 +59,28 @@ target_include_directories(imgui PUBLIC
 
 target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
 
-file(GLOB_RECURSE HEMLOK_SOURCES CONFIGURE_DEPENDS
+file(GLOB_RECURSE HEMLOK_LIBRARY_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
 )
+list(REMOVE_ITEM HEMLOK_LIBRARY_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/app.cc"
+)
 
-add_executable(hemlok ${HEMLOK_SOURCES})
-target_include_directories(hemlok PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+add_library(hemlok_lib STATIC ${HEMLOK_LIBRARY_SOURCES})
+target_include_directories(hemlok_lib PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
-target_link_libraries(hemlok PRIVATE imgui Boost::process)
+target_include_directories(hemlok_lib PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_link_libraries(hemlok_lib
+    PUBLIC Boost::process
+    PRIVATE imgui
+)
+
+add_executable(hemlok src/app.cc)
+target_link_libraries(hemlok PRIVATE hemlok_lib)
 
 if(APPLE)
-    target_compile_definitions(hemlok PRIVATE GL_SILENCE_DEPRECATION)
+    target_compile_definitions(hemlok_lib PRIVATE GL_SILENCE_DEPRECATION)
 endif()
