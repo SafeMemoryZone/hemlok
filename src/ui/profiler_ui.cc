@@ -45,8 +45,21 @@ bool ProfilerUi::Init() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForOpenGL(window_, true);
-    ImGui_ImplOpenGL3_Init(kGlslVersion);
+    if (!ImGui_ImplGlfw_InitForOpenGL(window_, true)) {
+        ImGui::DestroyContext();
+        glfwDestroyWindow(window_);
+        glfwTerminate();
+        window_ = nullptr;
+        return false;
+    }
+    if (!ImGui_ImplOpenGL3_Init(kGlslVersion)) {
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+        glfwDestroyWindow(window_);
+        glfwTerminate();
+        window_ = nullptr;
+        return false;
+    }
     return true;
 }
 
