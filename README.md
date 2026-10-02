@@ -34,7 +34,7 @@ git config core.hooksPath .githooks
 
 The hook checks staged C/C++ sources and headers against `.clang-format` and
 blocks commits with formatting errors. It does not modify files or the staging
-area. To format tracked sources, run `./format.sh`, review the changes, and stage
+area. To format tracked sources, run `./scripts/format.sh`, review the changes, and stage
 them before committing again.
 
 ## License
