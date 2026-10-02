@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+files=()
+while IFS= read -r -d '' file; do
+    files+=("$file")
+done < <(git diff --cached --name-only --diff-filter=ACMR -z -- \
+    '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hh' '*.hpp' '*.hxx')
+
+if [ "${#files[@]}" -eq 0 ]; then
+    exit 0
+fi
+
+if ! command -v clang-format >/dev/null 2>&1; then
+    echo "Commit blocked: install clang-format and make it available on PATH." >&2
+    exit 1
+fi
+
+failed=0
+for file in "${files[@]}"; do
+    if ! git show ":$file" | clang-format --dry-run --Werror --style=file --assume-filename="$file"; then
+        printf 'Formatting check failed: %s\n' "$file" >&2
+        failed=1
+    fi
+done
+
+if [ "$failed" -ne 0 ]; then
+    echo "Commit blocked: run ./format.sh, review and stage the formatted changes, then commit again." >&2
+    exit 1
+fi
