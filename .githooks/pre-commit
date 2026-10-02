@@ -27,6 +27,6 @@ for file in "${files[@]}"; do
 done
 
 if [ "$failed" -ne 0 ]; then
-    echo "Commit blocked: run ./format.sh, review and stage the formatted changes, then commit again." >&2
+    echo "Commit blocked: run ./scripts/format.sh, review and stage the formatted changes, then commit again." >&2
     exit 1
 fi
