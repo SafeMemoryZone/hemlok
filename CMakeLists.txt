@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(HEMLOK_BUILD_TESTS "Build the Hemlok test suite" ON)
+
 include(FetchContent)
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
@@ -28,7 +30,28 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 
-FetchContent_MakeAvailable(glfw imgui)
+# Boost.Process v2 is a compiled library and is fully based on Boost.Asio. Limit
+# the Boost superproject to Process and the Boost libraries it depends on.
+set(BOOST_INCLUDE_LIBRARIES process)
+set(BOOST_PROCESS_USE_STD_FS ON)
+FetchContent_Declare(
+    Boost
+    URL https://github.com/boostorg/boost/releases/download/boost-1.92.0/boost-1.92.0-cmake.tar.xz
+    URL_HASH SHA256=9bed76128d4e46755dbe818487788c6fceb6f72b378f4daa49b7e1e600d9088d
+    DOWNLOAD_EXTRACT_TIMESTAMP ON
+)
+
+FetchContent_MakeAvailable(glfw imgui Boost)
+
+if(HEMLOK_BUILD_TESTS)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.15.3
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(Catch2)
+endif()
 
 find_package(OpenGL REQUIRED)
 
@@ -48,17 +71,33 @@ target_include_directories(imgui PUBLIC
 
 target_link_libraries(imgui PUBLIC glfw OpenGL::GL)
 
-file(GLOB_RECURSE HEMLOK_SOURCES CONFIGURE_DEPENDS
+file(GLOB_RECURSE HEMLOK_LIBRARY_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
 )
-
-add_executable(hemlok ${HEMLOK_SOURCES})
-target_include_directories(hemlok PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/include"
+list(REMOVE_ITEM HEMLOK_LIBRARY_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/app.cc"
 )
-target_link_libraries(hemlok PRIVATE imgui)
+
+add_library(hemlok_lib STATIC ${HEMLOK_LIBRARY_SOURCES})
+target_include_directories(hemlok_lib PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+target_include_directories(hemlok_lib PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_link_libraries(hemlok_lib
+    PUBLIC Boost::process
+    PRIVATE imgui
+)
+
+add_executable(hemlok src/app.cc)
+target_link_libraries(hemlok PRIVATE hemlok_lib)
 
 if(APPLE)
-    target_compile_definitions(hemlok PRIVATE GL_SILENCE_DEPRECATION)
+    target_compile_definitions(hemlok_lib PRIVATE GL_SILENCE_DEPRECATION)
+endif()
+
+if(HEMLOK_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
