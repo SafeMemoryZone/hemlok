@@ -9,30 +9,46 @@
 
 namespace {
 using hemlok::process::Process;
+using hemlok::process::ProcessError;
 
-TEST_CASE("starting a missing executable throws", "[process]") {
-    const auto missing_executable =
-        std::filesystem::current_path() /
-        "hemlok-process-test-executable-that-does-not-exist";
-    REQUIRE_FALSE(std::filesystem::exists(missing_executable));
+TEST_CASE("starting a missing executable returns a file-not-found error",
+          "[process]") {
+    std::filesystem::path missing_executable;
+    SECTION("missing file") {
+        missing_executable =
+            std::filesystem::current_path() /
+            "hemlok-process-test-executable-that-does-not-exist";
+        REQUIRE_FALSE(std::filesystem::exists(missing_executable));
+    }
+    SECTION("empty path") { missing_executable = ""; }
+    SECTION("a parent component is a file") {
+        missing_executable =
+            std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH} / "child";
+    }
 
-    REQUIRE_THROWS(Process::startProcessFromExecutable(missing_executable));
+    const auto result = Process::startProcessFromExecutable(missing_executable);
+    REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == ProcessError::kFileNotFound);
 }
 
 TEST_CASE("a running process can be terminated", "[process]") {
     auto process = Process::startProcessFromExecutable(
         std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
 
-    SECTION("terminate the process") { REQUIRE_NOTHROW(process.terminate()); }
+    REQUIRE(process.has_value());
+    SECTION("terminate through the expected result") {
+        REQUIRE(process->terminate().has_value());
+    }
     SECTION("move the process value") {
-        Process owned_process = std::move(process);
-        REQUIRE_NOTHROW(owned_process.terminate());
+        Process owned_process = std::move(*process);
+        REQUIRE(owned_process.terminate().has_value());
     }
     SECTION("move-assign over another running process") {
         auto other = Process::startProcessFromExecutable(
             std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
-        other = std::move(process);
-        REQUIRE_NOTHROW(other.terminate());
+        REQUIRE(other.has_value());
+        *other = std::move(*process);
+        REQUIRE(other->terminate().has_value());
     }
 }
 }  // namespace

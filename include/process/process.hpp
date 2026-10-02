@@ -2,21 +2,32 @@
 #define HEMLOK_PROCESS_PROCESS_
 
 #include <boost/process/v2/process.hpp>
+#include <expected>
 #include <filesystem>
 #include <memory>
 
 #include "boost/asio/io_context.hpp"
 
 namespace hemlok::process {
+enum class ProcessError {
+    kFileNotFound,
+    kPermissionDenied,
+    kInvalidExecutable,
+    kStartFailed,
+    kTerminationFailed,
+};
+
 // A thin wrapper around Boost.Process
 class Process {
 public:
-    static Process startProcessFromExecutable(std::filesystem::path path);
+    [[nodiscard]] static std::expected<Process, ProcessError>
+    startProcessFromExecutable(std::filesystem::path path);
 
-    void terminate();
+    [[nodiscard]] std::expected<void, ProcessError> terminate();
 
 private:
-    explicit Process(std::filesystem::path path);
+    explicit Process(std::filesystem::path path,
+                     boost::system::error_code& error);
 
     // Keep the context alive until after the process is destroyed, including
     // when Process is moved or move-assigned.
