@@ -28,7 +28,18 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 
-FetchContent_MakeAvailable(glfw imgui)
+# Boost.Process v2 is a compiled library and is fully based on Boost.Asio. Limit
+# the Boost superproject to Process and the Boost libraries it depends on.
+set(BOOST_INCLUDE_LIBRARIES process)
+set(BOOST_PROCESS_USE_STD_FS ON)
+FetchContent_Declare(
+    Boost
+    URL https://github.com/boostorg/boost/releases/download/boost-1.92.0/boost-1.92.0-cmake.tar.xz
+    URL_HASH SHA256=9bed76128d4e46755dbe818487788c6fceb6f72b378f4daa49b7e1e600d9088d
+    DOWNLOAD_EXTRACT_TIMESTAMP ON
+)
+
+FetchContent_MakeAvailable(glfw imgui Boost)
 
 find_package(OpenGL REQUIRED)
 
@@ -57,7 +68,7 @@ target_include_directories(hemlok PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
-target_link_libraries(hemlok PRIVATE imgui)
+target_link_libraries(hemlok PRIVATE imgui Boost::process)
 
 if(APPLE)
     target_compile_definitions(hemlok PRIVATE GL_SILENCE_DEPRECATION)
