@@ -6,7 +6,10 @@ Process Process::startProcessFromExecutable(std::filesystem::path path) {
 }
 
 Process::Process(std::filesystem::path path)
-    : io_context_{}, process_(io_context_.get_executor(), path, {}) {}
+    : state_(std::make_unique<State>()) {
+    state_->process = boost::process::v2::process(
+        state_->io_context.get_executor(), path, {});
+}
 
-void Process::terminate() { process_.terminate(); }
+void Process::terminate() { state_->process.terminate(); }
 }  // namespace hemlok::process

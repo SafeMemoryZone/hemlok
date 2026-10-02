@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 #include <process/process.hpp>
+#include <utility>
 
 #ifndef HEMLOK_PROCESS_FIXTURE_PATH
 #error "HEMLOK_PROCESS_FIXTURE_PATH must identify the process test fixture"
@@ -22,6 +23,16 @@ TEST_CASE("a running process can be terminated", "[process]") {
     auto process = Process::startProcessFromExecutable(
         std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
 
-    REQUIRE_NOTHROW(process.terminate());
+    SECTION("terminate the process") { REQUIRE_NOTHROW(process.terminate()); }
+    SECTION("move the process value") {
+        Process owned_process = std::move(process);
+        REQUIRE_NOTHROW(owned_process.terminate());
+    }
+    SECTION("move-assign over another running process") {
+        auto other = Process::startProcessFromExecutable(
+            std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
+        other = std::move(process);
+        REQUIRE_NOTHROW(other.terminate());
+    }
 }
 }  // namespace
