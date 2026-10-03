@@ -16,6 +16,7 @@ enum class ProcessError {
     kInvalidExecutable,
     kStartFailed,
     kTerminationFailed,
+    kStatusQueryFailed,
 };
 
 // A thin wrapper around Boost.Process
@@ -28,6 +29,11 @@ public:
 
     [[nodiscard]] static std::expected<Process, ProcessError>
     StartProcessFromExecutable(std::filesystem::path path);
+
+    // Returns a snapshot of whether the child is running, or kNoProcess after
+    // ownership has been moved. Observing exit updates the cached process
+    // state.
+    [[nodiscard]] std::expected<bool, ProcessError> IsRunning();
 
     // Returns kNoProcess if ownership has been moved to another Process.
     [[nodiscard]] std::expected<void, ProcessError> Terminate();

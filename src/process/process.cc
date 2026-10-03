@@ -32,6 +32,22 @@ Process::Process(std::filesystem::path path, boost::system::error_code& error)
         std::vector<std::string>{});
 }
 
+std::expected<bool, ProcessError> Process::IsRunning() {
+    if (!state_) {
+        return std::unexpected(ProcessError::kNoProcess);
+    }
+    boost::system::error_code error;
+    const bool running = state_->process.running(error);
+    if (error) {
+        if (error == boost::system::errc::permission_denied ||
+            error == boost::system::errc::operation_not_permitted) {
+            return std::unexpected(ProcessError::kPermissionDenied);
+        }
+        return std::unexpected(ProcessError::kStatusQueryFailed);
+    }
+    return running;
+}
+
 std::expected<void, ProcessError> Process::Terminate() {
     if (!state_) {
         return std::unexpected(ProcessError::kNoProcess);

@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
+#include <chrono>
 #include <filesystem>
 #include <process/process.hpp>
+#include <thread>
 #include <utility>
 
 #ifndef HEMLOK_PROCESS_FIXTURE_PATH
@@ -56,5 +58,67 @@ TEST_CASE("a running process can be terminated", "[process]") {
         REQUIRE(result.error() == ProcessError::kNoProcess);
         REQUIRE(other->Terminate().has_value());
     }
+}
+TEST_CASE("process status reports running and terminated children",
+          "[process]") {
+    auto process = Process::StartProcessFromExecutable(
+        std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
+    REQUIRE(process.has_value());
+
+    const auto running = process->IsRunning();
+    REQUIRE(running.has_value());
+    REQUIRE(*running);
+
+    REQUIRE(process->Terminate().has_value());
+    for (int query = 0; query < 2; ++query) {
+        const auto stopped = process->IsRunning();
+        REQUIRE(stopped.has_value());
+        REQUIRE_FALSE(*stopped);
+    }
+}
+
+TEST_CASE("process status observes natural exit", "[process]") {
+    auto process = Process::StartProcessFromExecutable(
+        std::filesystem::path{HEMLOK_EXITING_PROCESS_FIXTURE_PATH});
+    REQUIRE(process.has_value());
+
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds{5};
+    auto running = process->IsRunning();
+    REQUIRE(running.has_value());
+    while (*running && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
+        running = process->IsRunning();
+        REQUIRE(running.has_value());
+    }
+    REQUIRE_FALSE(*running);
+    const auto repeated = process->IsRunning();
+    REQUIRE(repeated.has_value());
+    REQUIRE_FALSE(*repeated);
+}
+
+TEST_CASE("process status rejects moved-from objects", "[process]") {
+    auto process = Process::StartProcessFromExecutable(
+        std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
+    REQUIRE(process.has_value());
+
+    SECTION("move construction") {
+        Process owner = std::move(*process);
+        const auto running = owner.IsRunning();
+        REQUIRE(running.has_value());
+        REQUIRE(*running);
+    }
+    SECTION("move assignment") {
+        auto owner = Process::StartProcessFromExecutable(
+            std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
+        REQUIRE(owner.has_value());
+        *owner = std::move(*process);
+        const auto running = owner->IsRunning();
+        REQUIRE(running.has_value());
+        REQUIRE(*running);
+    }
+    const auto running = process->IsRunning();
+    REQUIRE_FALSE(running.has_value());
+    REQUIRE(running.error() == ProcessError::kNoProcess);
 }
 }  // namespace
