@@ -4,6 +4,7 @@
 #include <imgui_impl_opengl3.h>
 
 #include <algorithm>
+#include <boost/scope/scope_exit.hpp>
 #include <cstdlib>
 #include <filesystem>
 #include <optional>
@@ -69,6 +70,8 @@ int ProfilerUi::Start() {
         return EXIT_FAILURE;
     }
 
+    auto cleanup = boost::scope::scope_exit([this] { Shutdown(); });
+
     while (!glfwWindowShouldClose(window_)) {
         glfwPollEvents();
 
@@ -90,7 +93,6 @@ int ProfilerUi::Start() {
         glfwSwapBuffers(window_);
     }
 
-    Shutdown();
     return EXIT_SUCCESS;
 }
 

@@ -30,9 +30,8 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 
-# Boost.Process v2 is a compiled library and is fully based on Boost.Asio. Limit
-# the Boost superproject to Process and the Boost libraries it depends on.
-set(BOOST_INCLUDE_LIBRARIES process)
+# Boost.Process v2 uses Boost.Asio; Boost.Scope provides UI cleanup guards.
+set(BOOST_INCLUDE_LIBRARIES process scope)
 set(BOOST_PROCESS_USE_STD_FS ON)
 FetchContent_Declare(
     Boost
@@ -87,7 +86,7 @@ target_include_directories(hemlok_lib PRIVATE
 )
 target_link_libraries(hemlok_lib
     PUBLIC Boost::process
-    PRIVATE imgui
+    PRIVATE imgui Boost::scope
 )
 
 add_executable(hemlok src/app.cc)

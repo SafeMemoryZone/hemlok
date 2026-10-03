@@ -11,7 +11,12 @@ struct GLFWwindow;
 namespace hemlok::ui {
 class ProfilerUi {
 public:
+    // The profiler must outlive this UI.
     explicit ProfilerUi(profiler::Profiler& profiler);
+    ProfilerUi(const ProfilerUi&) = delete;
+    ProfilerUi& operator=(const ProfilerUi&) = delete;
+    ProfilerUi(ProfilerUi&&) = delete;
+    ProfilerUi& operator=(ProfilerUi&&) = delete;
 
     int Start();
 
