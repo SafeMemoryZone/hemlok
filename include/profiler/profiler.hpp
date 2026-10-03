@@ -12,7 +12,7 @@ class Profiler {
 public:
     Profiler() = default;
 
-    void AddProfilingTarget(ProfilingTarget target);
+    TargetId AddProfilingTarget(ProfilingTarget target);
     const std::unordered_map<TargetId, ProfilingTarget>& GetTargets() const;
 
 private:

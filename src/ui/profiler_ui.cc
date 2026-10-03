@@ -69,7 +69,6 @@ int ProfilerUi::Start() {
     if (!Init()) {
         return EXIT_FAILURE;
     }
-
     auto cleanup = boost::scope::scope_exit([this] { Shutdown(); });
 
     while (!glfwWindowShouldClose(window_)) {
@@ -110,7 +109,10 @@ void ProfilerUi::Draw() {
 
     if (ImGui::BeginPopupModal("Add target", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::InputText("Name", target_name_.data(), target_name_.size());
+        if (ImGui::InputText("Name", target_name_.data(),
+                             target_name_.size())) {
+            target_error_ = nullptr;
+        }
         ImGui::SameLine();
         ImGui::TextDisabled("(?)");
         if (ImGui::IsItemHovered()) {
@@ -118,34 +120,22 @@ void ProfilerUi::Draw() {
         }
         if (ImGui::InputText("Executable path", executable_path_.data(),
                              executable_path_.size())) {
-            invalid_path_ = false;
+            target_error_ = nullptr;
         }
-        if (invalid_path_) {
-            ImGui::SameLine();
-            ImGui::TextColored(ImVec4(1.0F, 0.3F, 0.3F, 1.0F), "Invalid path");
+        if (target_error_ != nullptr) {
+            ImGui::TextColored(ImVec4(1.0F, 0.3F, 0.3F, 1.0F), "%s",
+                               target_error_);
         }
 
-        if (ImGui::Button("Add")) {
-            std::filesystem::path executable_path(executable_path_.data());
-            std::error_code error;
-            if (!std::filesystem::is_regular_file(executable_path, error)) {
-                invalid_path_ = true;
-            } else {
-                std::optional<std::string> name;
-                if (target_name_[0] != '\0') {
-                    name.emplace(target_name_.data());
-                }
-                profiler_.AddProfilingTarget(profiler::ProfilingTarget{
-                    std::move(name), std::move(executable_path)});
-                target_name_.fill('\0');
-                executable_path_.fill('\0');
-                invalid_path_ = false;
-                ImGui::CloseCurrentPopup();
-            }
+        if (ImGui::Button("Add") && AddTarget()) {
+            target_name_.fill('\0');
+            executable_path_.fill('\0');
+            target_error_ = nullptr;
+            ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
-            invalid_path_ = false;
+            target_error_ = nullptr;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -156,7 +146,7 @@ void ProfilerUi::Draw() {
     for (const auto& [target_id, target] : profiler_.GetTargets()) {
         const bool is_selected = selected_target_ == target_id;
         const std::string label =
-            target.name.value_or(target.executable_path.string());
+            target.GetName().value_or(target.GetExecutablePath().string());
 
         ImGui::PushID(static_cast<int>(target_id));
         if (ImGui::Selectable(label.c_str(), is_selected)) {
@@ -181,17 +171,56 @@ void ProfilerUi::Draw() {
     ImGui::End();
 }
 
+bool ProfilerUi::AddTarget() {
+    std::filesystem::path executable_path(executable_path_.data());
+    if (executable_path.empty()) {
+        target_error_ = "Enter an executable path.";
+        return false;
+    }
+
+    std::error_code error;
+    executable_path = std::filesystem::absolute(executable_path, error);
+    if (error || !std::filesystem::is_regular_file(executable_path, error)) {
+        target_error_ = "Path must refer to an existing regular file.";
+        return false;
+    }
+
+    std::optional<std::string> name;
+    if (target_name_[0] != '\0') {
+        name.emplace(target_name_.data());
+    }
+    auto target = profiler::ProfilingTarget::Create(std::move(name),
+                                                    std::move(executable_path));
+    if (!target) {
+        switch (target.error()) {
+            case profiler::TargetError::kBlankName:
+                target_error_ = "Name must contain a non-whitespace character.";
+                break;
+            case profiler::TargetError::kEmptyPath:
+                target_error_ = "Enter an executable path.";
+                break;
+            case profiler::TargetError::kRelativePath:
+                target_error_ = "Executable path must be absolute.";
+                break;
+        }
+        return false;
+    }
+
+    selected_target_ = profiler_.AddProfilingTarget(std::move(*target));
+    return true;
+}
+
 void ProfilerUi::DrawTargetDetails(const profiler::ProfilingTarget& target) {
     const ImGuiStyle& style = ImGui::GetStyle();
 
     ImGui::PushTextWrapPos(0.0F);
-    if (target.name.has_value()) {
+    if (target.GetName().has_value()) {
         ImGui::TextDisabled("Name");
-        ImGui::TextUnformatted(target.name->c_str());
+        ImGui::TextUnformatted(target.GetName()->c_str());
         ImGui::Spacing();
     }
     ImGui::TextDisabled("Executable");
-    ImGui::TextUnformatted(target.executable_path.string().c_str());
+    ImGui::TextUnformatted(target.GetExecutablePath().string().c_str());
     ImGui::PopTextWrapPos();
 
     ImGui::Separator();

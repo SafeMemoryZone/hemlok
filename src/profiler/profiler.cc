@@ -2,8 +2,11 @@
 #include <utility>
 
 namespace hemlok::profiler {
-void Profiler::AddProfilingTarget(ProfilingTarget target) {
-    targets_.emplace(next_target_id_++, std::move(target));
+TargetId Profiler::AddProfilingTarget(ProfilingTarget target) {
+    const TargetId id = next_target_id_;
+    targets_.emplace(id, std::move(target));
+    ++next_target_id_;
+    return id;
 }
 
 const std::unordered_map<TargetId, ProfilingTarget>& Profiler::GetTargets()
