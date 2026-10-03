@@ -33,6 +33,9 @@ Process::Process(std::filesystem::path path, boost::system::error_code& error)
 }
 
 std::expected<void, ProcessError> Process::Terminate() {
+    if (!state_) {
+        return std::unexpected(ProcessError::kNoProcess);
+    }
     boost::system::error_code error;
     state_->process.terminate(error);
     if (error) {

@@ -41,6 +41,9 @@ TEST_CASE("a running process can be terminated", "[process]") {
     }
     SECTION("move the process value") {
         Process owned_process = std::move(*process);
+        const auto result = process->Terminate();
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error() == ProcessError::kNoProcess);
         REQUIRE(owned_process.Terminate().has_value());
     }
     SECTION("move-assign over another running process") {
@@ -48,6 +51,9 @@ TEST_CASE("a running process can be terminated", "[process]") {
             std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
         REQUIRE(other.has_value());
         *other = std::move(*process);
+        const auto result = process->Terminate();
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error() == ProcessError::kNoProcess);
         REQUIRE(other->Terminate().has_value());
     }
 }

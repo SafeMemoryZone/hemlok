@@ -10,6 +10,7 @@
 
 namespace hemlok::process {
 enum class ProcessError {
+    kNoProcess,
     kFileNotFound,
     kPermissionDenied,
     kInvalidExecutable,
@@ -20,9 +21,15 @@ enum class ProcessError {
 // A thin wrapper around Boost.Process
 class Process {
 public:
+    Process(const Process&) = delete;
+    Process& operator=(const Process&) = delete;
+    Process(Process&&) noexcept = default;
+    Process& operator=(Process&&) noexcept = default;
+
     [[nodiscard]] static std::expected<Process, ProcessError>
     StartProcessFromExecutable(std::filesystem::path path);
 
+    // Returns kNoProcess if ownership has been moved to another Process.
     [[nodiscard]] std::expected<void, ProcessError> Terminate();
 
 private:
