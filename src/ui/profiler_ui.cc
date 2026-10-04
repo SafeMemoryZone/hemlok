@@ -5,7 +5,9 @@
 
 #include <algorithm>
 #include <boost/scope/scope_exit.hpp>
+#include <chrono>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <optional>
 #include <profiler/profiling_target.hpp>
@@ -13,6 +15,7 @@
 #include <system_error>
 #include <ui/profiler_ui.hpp>
 #include <utility>
+#include <vector>
 
 namespace hemlok::ui {
 
@@ -96,6 +99,8 @@ int ProfilerUi::Start() {
 }
 
 void ProfilerUi::Draw() {
+    profiler_
+        .Poll();  // NOTE: this will eventually be done by the sampling worker
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
@@ -151,6 +156,7 @@ void ProfilerUi::Draw() {
         ImGui::PushID(static_cast<int>(target_id));
         if (ImGui::Selectable(label.c_str(), is_selected)) {
             selected_target_ = target_id;
+            run_error_ = nullptr;
         }
         ImGui::PopID();
     }
@@ -162,7 +168,7 @@ void ProfilerUi::Draw() {
         if (target != targets.end()) {
             ImGui::SameLine();
             if (ImGui::BeginChild("Target details")) {
-                DrawTargetDetails(target->second);
+                DrawTargetDetails(target->first, target->second);
             }
             ImGui::EndChild();
         }
@@ -210,9 +216,8 @@ bool ProfilerUi::AddTarget() {
     return true;
 }
 
-void ProfilerUi::DrawTargetDetails(const profiler::ProfilingTarget& target) {
-    const ImGuiStyle& style = ImGui::GetStyle();
-
+void ProfilerUi::DrawTargetDetails(profiler::TargetId id,
+                                   const profiler::ProfilingTarget& target) {
     ImGui::PushTextWrapPos(0.0F);
     if (target.GetName().has_value()) {
         ImGui::TextDisabled("Name");
@@ -226,37 +231,117 @@ void ProfilerUi::DrawTargetDetails(const profiler::ProfilingTarget& target) {
     ImGui::Separator();
     ImGui::Spacing();
 
-    constexpr const char* kButtonLabel = "Start profiling";
-    constexpr const char* kHelpText =
-        "Profile this target to start collecting performance data.";
-    const ImVec2 origin = ImGui::GetCursorPos();
-    const ImVec2 available = ImGui::GetContentRegionAvail();
-    const float width = std::max(1.0F, available.x);
-    const float wrap_width = std::min(width, ImGui::GetFontSize() * 26.0F);
-    const ImVec2 help_size =
-        ImGui::CalcTextSize(kHelpText, nullptr, false, wrap_width);
-    const ImVec2 button_size(
-        std::min(width, ImGui::CalcTextSize(kButtonLabel).x +
-                            style.FramePadding.x * 6.0F),
-        ImGui::GetFrameHeight() + style.FramePadding.y * 2.0F);
-    const float content_height =
-        button_size.y + style.ItemSpacing.y * 2.0F + help_size.y;
-    const float content_top =
-        origin.y + std::max(0.0F, (available.y - content_height) * 0.5F);
+    if (ImGui::Button("Start profiling")) {
+        const auto result = profiler_.Profile(id);
+        run_error_ = nullptr;
+        if (!result) {
+            switch (result.error()) {
+                case profiler::ProfilerError::kProcessStartFailed:
+                    run_error_ =
+                        "Could not start the executable. Check its path and "
+                        "permissions.";
+                    break;
+                case profiler::ProfilerError::kProcessTerminated:
+                    run_error_ =
+                        "The process exited before the run could start.";
+                    break;
+                case profiler::ProfilerError::kStatusQueryFailed:
+                    run_error_ = "Could not query the process status.";
+                    break;
+                case profiler::ProfilerError::kTerminationFailed:
+                    run_error_ = "Could not terminate the process.";
+                    break;
+            }
+        }
+    }
+    DrawRuns(id);
+    if (run_error_ != nullptr) {
+        ImGui::TextColored(ImVec4(1.0F, 0.3F, 0.3F, 1.0F), "%s", run_error_);
+    }
+}
 
-    ImGui::SetCursorPos(
-        ImVec2(origin.x + (width - button_size.x) * 0.5F, content_top));
-    // Profiling will be wired up when the backend supports starting a session.
-    ImGui::Button(kButtonLabel, button_size);
-
-    ImGui::SetCursorPos(
-        ImVec2(origin.x + (width - help_size.x) * 0.5F,
-               content_top + button_size.y + style.ItemSpacing.y * 2.0F));
-    ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_TextDisabled]);
-    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap_width);
-    ImGui::TextUnformatted(kHelpText);
-    ImGui::PopTextWrapPos();
-    ImGui::PopStyleColor();
+void ProfilerUi::DrawRuns(profiler::TargetId target) {
+    ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextBorderSize, 1.0F);
+    ImGui::SeparatorText("Runs");
+    ImGui::PopStyleVar();
+    std::vector<profiler::RunId> run_ids;
+    for (const auto& [id, entry] : profiler_.GetRuns()) {
+        if (entry.id == target) {
+            run_ids.push_back(id);
+        }
+    }
+    std::sort(run_ids.rbegin(), run_ids.rend());
+    if (run_ids.empty()) {
+        ImGui::TextDisabled("No runs yet.");
+        return;
+    }
+    if (!ImGui::BeginTable("Runs", 6,
+                           ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
+                               ImGuiTableFlags_ScrollX)) {
+        return;
+    }
+    for (const char* label :
+         {"Run", "Status", "Started", "Finished", "Duration", "Action"}) {
+        ImGui::TableSetupColumn(label);
+    }
+    ImGui::TableHeadersRow();
+    const auto draw_time = [](std::chrono::system_clock::time_point time) {
+        const std::time_t value = std::chrono::system_clock::to_time_t(time);
+        const std::tm* local = std::localtime(&value);
+        char text[32]{};
+        if (local &&
+            std::strftime(text, sizeof(text), "%Y-%m-%d %H:%M:%S", local)) {
+            ImGui::TextUnformatted(text);
+        } else {
+            ImGui::TextUnformatted("Unavailable");
+        }
+    };
+    // Number runs in creation order within this target, newest first.
+    std::size_t run_number = run_ids.size();
+    for (const auto id : run_ids) {
+        const auto& run = profiler_.GetRuns().at(id).profiling_run;
+        const std::string widget_id = std::to_string(id);
+        const std::string label = "#" + std::to_string(run_number--);
+        ImGui::PushID(widget_id.c_str());
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(label.c_str());
+        ImGui::TableNextColumn();
+        if (const auto error = run.GetPollError()) {
+            ImGui::TextColored(ImVec4(1.0F, 0.7F, 0.2F, 1.0F), "Status stale");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    *error == process::ProcessError::kPermissionDenied
+                        ? "Permission denied while checking process status. "
+                          "Retrying."
+                        : "Could not check process status. Retrying.");
+            }
+        } else {
+            ImGui::TextUnformatted(run.IsRunning() ? "Running" : "Finished");
+        }
+        ImGui::TableNextColumn();
+        draw_time(run.GetStartTime());
+        ImGui::TableNextColumn();
+        if (run.GetFinishTime()) {
+            draw_time(*run.GetFinishTime());
+        } else {
+            ImGui::TextUnformatted("--");
+        }
+        ImGui::TableNextColumn();
+        const auto end =
+            run.GetFinishTime().value_or(std::chrono::system_clock::now());
+        const double seconds =
+            std::chrono::duration<double>(end - run.GetStartTime()).count();
+        ImGui::Text("%.2f s", std::max(0.0, seconds));
+        ImGui::TableNextColumn();
+        if (run.IsRunning() && ImGui::Button("Terminate")) {
+            run_error_ = profiler_.Terminate(id)
+                             ? nullptr
+                             : "Could not terminate the process.";
+        }
+        ImGui::PopID();
+    }
+    ImGui::EndTable();
 }
 
 void ProfilerUi::Shutdown() {

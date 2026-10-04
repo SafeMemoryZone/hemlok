@@ -27,13 +27,16 @@ private:
     bool Init();
     void Draw();
     bool AddTarget();
-    void DrawTargetDetails(const profiler::ProfilingTarget& target);
+    void DrawTargetDetails(profiler::TargetId id,
+                           const profiler::ProfilingTarget& target);
+    void DrawRuns(profiler::TargetId target);
     void Shutdown();
 
     // UI state
     std::array<char, kNameCapacity> target_name_{};
     std::array<char, kPathCapacity> executable_path_{};
     const char* target_error_ = nullptr;
+    const char* run_error_ = nullptr;
     std::optional<profiler::TargetId> selected_target_;
 
     // App state
