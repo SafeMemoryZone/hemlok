@@ -19,7 +19,7 @@ enum class TargetError {
 // Moved-from targets must be reassigned before reuse.
 class ProfilingTarget {
 public:
-    [[nodiscard]] static std::expected<ProfilingTarget, TargetError> Create(
+    static std::expected<ProfilingTarget, TargetError> Create(
         std::optional<std::string> name,
         std::filesystem::path executable_path) {
         if (name &&

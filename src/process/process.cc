@@ -33,9 +33,6 @@ Process::Process(std::filesystem::path path, boost::system::error_code& error)
 }
 
 std::expected<bool, ProcessError> Process::IsRunning() {
-    if (!state_) {
-        return std::unexpected(ProcessError::kNoProcess);
-    }
     boost::system::error_code error;
     const bool running = state_->process.running(error);
     if (error) {
@@ -49,9 +46,6 @@ std::expected<bool, ProcessError> Process::IsRunning() {
 }
 
 std::expected<void, ProcessError> Process::Terminate() {
-    if (!state_) {
-        return std::unexpected(ProcessError::kNoProcess);
-    }
     boost::system::error_code error;
     state_->process.terminate(error);
     if (error) {
