@@ -26,7 +26,7 @@ public:
     Process(Process&&) noexcept = default;
     Process& operator=(Process&&) noexcept = default;
 
-    static std::expected<Process, ProcessError> StartProcessFromExecutable(
+    static std::expected<Process, ProcessError> CreateFromExecutable(
         std::filesystem::path path);
 
     std::expected<bool, ProcessError> IsRunning();

@@ -212,7 +212,7 @@ bool ProfilerUi::AddTarget() {
         return false;
     }
 
-    selected_target_ = profiler_.AddProfilingTarget(std::move(*target));
+    selected_target_ = profiler_.AddTarget(std::move(*target));
     return true;
 }
 
@@ -232,7 +232,7 @@ void ProfilerUi::DrawTargetDetails(profiler::TargetId id,
     ImGui::Spacing();
 
     if (ImGui::Button("Start profiling")) {
-        const auto result = profiler_.Profile(id);
+        const auto result = profiler_.StartRun(id);
         run_error_ = nullptr;
         if (!result) {
             switch (result.error()) {
@@ -335,7 +335,7 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
         ImGui::Text("%.2f s", std::max(0.0, seconds));
         ImGui::TableNextColumn();
         if (run.IsRunning() && ImGui::Button("Terminate")) {
-            run_error_ = profiler_.Terminate(id)
+            run_error_ = profiler_.TerminateRun(id)
                              ? nullptr
                              : "Could not terminate the process.";
         }

@@ -28,13 +28,13 @@ TEST_CASE("starting a missing executable returns a file-not-found error",
             std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH} / "child";
     }
 
-    const auto result = Process::StartProcessFromExecutable(missing_executable);
+    const auto result = Process::CreateFromExecutable(missing_executable);
     REQUIRE_FALSE(result.has_value());
     REQUIRE(result.error() == ProcessError::kFileNotFound);
 }
 
 TEST_CASE("a running process can be terminated", "[process]") {
-    auto process = Process::StartProcessFromExecutable(
+    auto process = Process::CreateFromExecutable(
         std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
 
     REQUIRE(process.has_value());
@@ -46,7 +46,7 @@ TEST_CASE("a running process can be terminated", "[process]") {
         REQUIRE(owned_process.Terminate().has_value());
     }
     SECTION("move-assign over another running process") {
-        auto other = Process::StartProcessFromExecutable(
+        auto other = Process::CreateFromExecutable(
             std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
         REQUIRE(other.has_value());
         *other = std::move(*process);
@@ -55,7 +55,7 @@ TEST_CASE("a running process can be terminated", "[process]") {
 }
 TEST_CASE("process status reports running and terminated children",
           "[process]") {
-    auto process = Process::StartProcessFromExecutable(
+    auto process = Process::CreateFromExecutable(
         std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
     REQUIRE(process.has_value());
 
@@ -72,7 +72,7 @@ TEST_CASE("process status reports running and terminated children",
 }
 
 TEST_CASE("process status observes natural exit", "[process]") {
-    auto process = Process::StartProcessFromExecutable(
+    auto process = Process::CreateFromExecutable(
         std::filesystem::path{HEMLOK_EXITING_PROCESS_FIXTURE_PATH});
     REQUIRE(process.has_value());
 
@@ -92,7 +92,7 @@ TEST_CASE("process status observes natural exit", "[process]") {
 }
 
 TEST_CASE("process status works after ownership is moved", "[process]") {
-    auto process = Process::StartProcessFromExecutable(
+    auto process = Process::CreateFromExecutable(
         std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
     REQUIRE(process.has_value());
 
@@ -103,7 +103,7 @@ TEST_CASE("process status works after ownership is moved", "[process]") {
         REQUIRE(*running);
     }
     SECTION("move assignment") {
-        auto owner = Process::StartProcessFromExecutable(
+        auto owner = Process::CreateFromExecutable(
             std::filesystem::path{HEMLOK_PROCESS_FIXTURE_PATH});
         REQUIRE(owner.has_value());
         *owner = std::move(*process);

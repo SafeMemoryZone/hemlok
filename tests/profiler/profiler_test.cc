@@ -28,8 +28,7 @@ TEST_CASE("a profiler stores a named target", "[profiler]") {
     Profiler profiler;
     const std::filesystem::path executable_path = "/usr/bin/example";
 
-    const auto id =
-        profiler.AddProfilingTarget(MakeTarget("example", executable_path));
+    const auto id = profiler.AddTarget(MakeTarget("example", executable_path));
     REQUIRE(id == 0);
 
     const auto& targets = profiler.GetTargets();
@@ -42,8 +41,8 @@ TEST_CASE("a profiler stores a named target", "[profiler]") {
 TEST_CASE("a profiler stores a target without a name", "[profiler]") {
     Profiler profiler;
 
-    const auto id = profiler.AddProfilingTarget(
-        MakeTarget(std::nullopt, "/usr/bin/unnamed"));
+    const auto id =
+        profiler.AddTarget(MakeTarget(std::nullopt, "/usr/bin/unnamed"));
     REQUIRE(id == 0);
 
     const auto& target = profiler.GetTargets().at(0);
@@ -54,14 +53,11 @@ TEST_CASE("a profiler stores a target without a name", "[profiler]") {
 TEST_CASE("a profiler assigns consecutive target IDs", "[profiler]") {
     Profiler profiler;
 
-    const auto first =
-        profiler.AddProfilingTarget(MakeTarget("first", "/bin/first"));
+    const auto first = profiler.AddTarget(MakeTarget("first", "/bin/first"));
     REQUIRE(first == 0);
-    const auto second =
-        profiler.AddProfilingTarget(MakeTarget("second", "/bin/second"));
+    const auto second = profiler.AddTarget(MakeTarget("second", "/bin/second"));
     REQUIRE(second == 1);
-    const auto third =
-        profiler.AddProfilingTarget(MakeTarget("third", "/bin/third"));
+    const auto third = profiler.AddTarget(MakeTarget("third", "/bin/third"));
     REQUIRE(third == 2);
 
     const auto& targets = profiler.GetTargets();
@@ -76,8 +72,7 @@ TEST_CASE("existing target references observe newly added targets",
     Profiler profiler;
     const auto& targets = profiler.GetTargets();
 
-    REQUIRE(profiler.AddProfilingTarget(MakeTarget("later", "/bin/later")) ==
-            0);
+    REQUIRE(profiler.AddTarget(MakeTarget("later", "/bin/later")) == 0);
 
     REQUIRE(targets.size() == 1);
     REQUIRE(targets.at(0).GetName() == std::optional<std::string>{"later"});
@@ -87,8 +82,8 @@ TEST_CASE("duplicate target configurations receive distinct IDs",
           "[profiler]") {
     Profiler profiler;
     const auto target = MakeTarget("worker", "/bin/worker");
-    const auto first = profiler.AddProfilingTarget(target);
-    const auto second = profiler.AddProfilingTarget(target);
+    const auto first = profiler.AddTarget(target);
+    const auto second = profiler.AddTarget(target);
     REQUIRE(first != second);
     REQUIRE(profiler.GetTargets().size() == 2);
 }
@@ -96,11 +91,11 @@ TEST_CASE("profiling starts independent runs and retains terminated history",
           "[profiler]") {
     Profiler profiler;
     REQUIRE(profiler.GetRuns().empty());
-    const auto target = profiler.AddProfilingTarget(
-        MakeTarget("worker", HEMLOK_PROCESS_FIXTURE_PATH));
+    const auto target =
+        profiler.AddTarget(MakeTarget("worker", HEMLOK_PROCESS_FIXTURE_PATH));
     const auto before = std::chrono::system_clock::now();
-    const auto first = profiler.Profile(target);
-    const auto second = profiler.Profile(target);
+    const auto first = profiler.StartRun(target);
+    const auto second = profiler.StartRun(target);
     REQUIRE(first.has_value());
     REQUIRE(second.has_value());
     REQUIRE(*first == 0);
@@ -118,20 +113,20 @@ TEST_CASE("profiling starts independent runs and retains terminated history",
     }
     REQUIRE(entry.profiling_run.IsRunning());
     REQUIRE_FALSE(entry.profiling_run.GetFinishTime());
-    REQUIRE(profiler.Terminate(*first).has_value());
+    REQUIRE(profiler.TerminateRun(*first).has_value());
     const auto finish = entry.profiling_run.GetFinishTime();
     REQUIRE(finish.has_value());
     REQUIRE_FALSE(entry.profiling_run.IsRunning());
     REQUIRE(*finish >= entry.profiling_run.GetStartTime());
     REQUIRE(*finish <= std::chrono::system_clock::now());
-    REQUIRE(profiler.Terminate(*first).has_value());
+    REQUIRE(profiler.TerminateRun(*first).has_value());
     profiler.Poll();
     for (const auto& [id, entry] : profiler.GetRuns()) {
         REQUIRE_FALSE(entry.profiling_run.GetPollError().has_value());
     }
     REQUIRE(entry.profiling_run.GetFinishTime() == finish);
     REQUIRE_FALSE(profiler.GetRuns().at(*second).profiling_run.GetFinishTime());
-    REQUIRE(profiler.Terminate(*second).has_value());
+    REQUIRE(profiler.TerminateRun(*second).has_value());
     REQUIRE(profiler.GetRuns().size() == 2);
 }
 
@@ -141,27 +136,26 @@ TEST_CASE("failed launches do not create runs or consume run IDs",
     const auto missing =
         std::filesystem::current_path() / "hemlok-missing-run-executable";
     REQUIRE_FALSE(std::filesystem::exists(missing));
-    const auto target =
-        profiler.AddProfilingTarget(MakeTarget("missing", missing));
-    const auto result = profiler.Profile(target);
+    const auto target = profiler.AddTarget(MakeTarget("missing", missing));
+    const auto result = profiler.StartRun(target);
     REQUIRE_FALSE(result.has_value());
     REQUIRE(result.error() ==
             hemlok::profiler::ProfilerError::kProcessStartFailed);
     REQUIRE(profiler.GetRuns().empty());
-    const auto valid = profiler.AddProfilingTarget(
-        MakeTarget("worker", HEMLOK_PROCESS_FIXTURE_PATH));
-    const auto run = profiler.Profile(valid);
+    const auto valid =
+        profiler.AddTarget(MakeTarget("worker", HEMLOK_PROCESS_FIXTURE_PATH));
+    const auto run = profiler.StartRun(valid);
     REQUIRE(run.has_value());
     REQUIRE(*run == 0);
-    REQUIRE(profiler.Terminate(*run).has_value());
+    REQUIRE(profiler.TerminateRun(*run).has_value());
 }
 
 TEST_CASE("polling records natural process exit", "[profiler]") {
     Profiler profiler;
-    const auto target = profiler.AddProfilingTarget(
+    const auto target = profiler.AddTarget(
         MakeTarget("short lived", HEMLOK_EXITING_PROCESS_FIXTURE_PATH));
-    const auto result = profiler.Profile(target);
-    // A short-lived child may exit before StartProfiling observes it.
+    const auto result = profiler.StartRun(target);
+    // A short-lived child may exit before Create observes it.
     if (!result) {
         REQUIRE(result.error() ==
                 hemlok::profiler::ProfilerError::kProcessTerminated);
@@ -183,7 +177,7 @@ TEST_CASE("polling records natural process exit", "[profiler]") {
     REQUIRE(run.GetFinishTime().has_value());
     REQUIRE(*run.GetFinishTime() >= run.GetStartTime());
     const auto finish = run.GetFinishTime();
-    REQUIRE(profiler.Terminate(*result).has_value());
+    REQUIRE(profiler.TerminateRun(*result).has_value());
     profiler.Poll();
     for (const auto& [id, entry] : profiler.GetRuns()) {
         REQUIRE_FALSE(entry.profiling_run.GetPollError().has_value());
@@ -192,23 +186,22 @@ TEST_CASE("polling records natural process exit", "[profiler]") {
 }
 
 TEST_CASE("profiling rejects an already terminated process", "[profiler]") {
-    auto process = hemlok::process::Process::StartProcessFromExecutable(
+    auto process = hemlok::process::Process::CreateFromExecutable(
         HEMLOK_PROCESS_FIXTURE_PATH);
     REQUIRE(process.has_value());
     REQUIRE(process->Terminate().has_value());
     const auto run =
-        hemlok::profiler::ProfilingRun::StartProfiling(std::move(*process));
+        hemlok::profiler::ProfilingRun::Create(std::move(*process));
     REQUIRE_FALSE(run.has_value());
     REQUIRE(run.error() ==
             hemlok::profiler::ProfilingRunError::kProcessTerminated);
 }
 TEST_CASE("polling a run preserves running state and completed timestamps",
           "[profiler]") {
-    auto process = hemlok::process::Process::StartProcessFromExecutable(
+    auto process = hemlok::process::Process::CreateFromExecutable(
         HEMLOK_PROCESS_FIXTURE_PATH);
     REQUIRE(process.has_value());
-    auto run =
-        hemlok::profiler::ProfilingRun::StartProfiling(std::move(*process));
+    auto run = hemlok::profiler::ProfilingRun::Create(std::move(*process));
     REQUIRE(run.has_value());
     const auto& snapshot = *run;
     const auto start = snapshot.GetStartTime();

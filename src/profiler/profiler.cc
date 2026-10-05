@@ -3,22 +3,22 @@
 #include <utility>
 
 namespace hemlok::profiler {
-TargetId Profiler::AddProfilingTarget(ProfilingTarget target) {
+TargetId Profiler::AddTarget(ProfilingTarget target) {
     const TargetId id = next_target_id_;
     targets_.emplace(id, std::move(target));
     ++next_target_id_;
     return id;
 }
 
-std::expected<RunId, ProfilerError> Profiler::Profile(TargetId target) {
+std::expected<RunId, ProfilerError> Profiler::StartRun(TargetId target) {
     const auto entry = targets_.find(target);
     assert(entry != targets_.end());
-    auto process = process::Process::StartProcessFromExecutable(
+    auto process = process::Process::CreateFromExecutable(
         entry->second.GetExecutablePath());
     if (!process) {
         return std::unexpected(ProfilerError::kProcessStartFailed);
     }
-    auto run = ProfilingRun::StartProfiling(std::move(*process));
+    auto run = ProfilingRun::Create(std::move(*process));
     if (!run) {
         return std::unexpected(run.error() ==
                                        ProfilingRunError::kProcessTerminated
@@ -31,7 +31,7 @@ std::expected<RunId, ProfilerError> Profiler::Profile(TargetId target) {
     return id;
 }
 
-std::expected<void, ProfilerError> Profiler::Terminate(RunId run) {
+std::expected<void, ProfilerError> Profiler::TerminateRun(RunId run) {
     const auto entry = profiling_runs_.find(run);
     assert(entry != profiling_runs_.end());
     if (!entry->second.profiling_run.Terminate()) {

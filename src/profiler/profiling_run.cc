@@ -6,7 +6,7 @@ ProfilingRun::ProfilingRun(process::Process process)
     : process_(std::move(process)),
       start_time_(std::chrono::system_clock::now()) {}
 
-std::expected<ProfilingRun, ProfilingRunError> ProfilingRun::StartProfiling(
+std::expected<ProfilingRun, ProfilingRunError> ProfilingRun::Create(
     process::Process process) {
     const auto running = process.IsRunning();
     if (!running) {

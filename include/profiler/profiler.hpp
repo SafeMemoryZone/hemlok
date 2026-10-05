@@ -27,9 +27,9 @@ class Profiler {
 public:
     Profiler() = default;
 
-    TargetId AddProfilingTarget(ProfilingTarget target);
-    std::expected<RunId, ProfilerError> Profile(TargetId target);
-    std::expected<void, ProfilerError> Terminate(RunId run);
+    TargetId AddTarget(ProfilingTarget target);
+    std::expected<RunId, ProfilerError> StartRun(TargetId target);
+    std::expected<void, ProfilerError> TerminateRun(RunId run);
     // Each run retains its own polling error.
     void Poll();
     const std::unordered_map<TargetId, ProfilingTarget>& GetTargets() const;

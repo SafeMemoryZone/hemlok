@@ -13,7 +13,7 @@ enum ProfilingRunError {
 
 class ProfilingRun {
 public:
-    static std::expected<ProfilingRun, ProfilingRunError> StartProfiling(
+    static std::expected<ProfilingRun, ProfilingRunError> Create(
         process::Process process);
 
     std::expected<void, process::ProcessError> Terminate();
