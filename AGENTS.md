@@ -30,6 +30,20 @@ Follow the [Google C++ Style Guide](https://google.github.io/styleguide/cppguide
 - Namespaces: lowercase with underscores where needed, e.g. `hemlok::profiler`.
 - Filenames: lowercase with underscores, e.g. `profiling_target.hpp`; macros and include guards: `UPPER_SNAKE_CASE`.
 
+## Data Records
+
+Use structs only for data records, with public fields. Use classes for types that manage resources, implement behavior, or enforce invariants. Prefer immutable records after construction or publication. Enforce read-only access through const references or pointers at consumer boundaries; avoid `const` data members when they would prevent assignment or efficient movement.
+
+## Change Scope
+
+Keep changes focused on the requested task. Avoid unrelated refactoring unless explicitly requested.
+
+## Error Handling
+
+Return `std::expected` errors only for expected operational failures or invalid user input. Examples include a missing executable or permission denial in `Process::CreateFromExecutable()`, process status query failures in `Process::IsRunning()`, termination failures in `Process::Terminate()`, and blank names or empty/relative paths in `ProfilingTarget::Create()`.
+
+Programming bugs and violated internal preconditions should be asserted, not represented as `std::expected` errors. For example, passing an unknown `TargetId` to `Profiler::StartRun()` or an unknown `RunId` to `Profiler::TerminateRun()` is a caller bug; assert that the ID exists before using it. Keep required operations outside assertions, since assertions may be disabled in release builds.
+
 ## Testing Guidelines
 
 Tests use Catch2 v3 and CTest. Name test sources `*_test.cc`; CMake discovers these automatically. Use descriptive `TEST_CASE` names and module tags such as `[process]`. Add tests for changed behavior, including failure paths, and use the supplied process fixture for subprocess tests. No numerical coverage threshold is configured.
