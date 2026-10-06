@@ -75,8 +75,8 @@ Profiler::GetCompletedRuns() const {
 }
 
 std::shared_ptr<const CompletedRun> Profiler::GetCompletedRun(RunId run) const {
-    assert(run_overviews_.contains(run));
     const auto entry = completed_runs_.find(run);
-    return entry == completed_runs_.end() ? nullptr : entry->second;
+    assert(entry != completed_runs_.end());
+    return entry->second;
 }
 }  // namespace hemlok::profiler

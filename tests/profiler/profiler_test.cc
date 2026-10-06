@@ -87,6 +87,12 @@ TEST_CASE("duplicate target configurations receive distinct IDs",
 using hemlok::profiler::RunOutcome;
 using hemlok::profiler::RunStatus;
 
+bool IsCompleted(const hemlok::profiler::RunOverview& overview) {
+    return overview.status == RunStatus::kFinished ||
+           overview.status == RunStatus::kTerminated ||
+           overview.status == RunStatus::kFailed;
+}
+
 template <typename Predicate>
 void WaitFor(Profiler& profiler, Predicate predicate) {
     const auto deadline =
@@ -112,7 +118,7 @@ TEST_CASE("independent runs retain immutable terminated history",
     REQUIRE(*second == *first + 1);
     REQUIRE(profiler.GetRunOverviews().at(*first).status ==
             RunStatus::kStarting);
-    REQUIRE_FALSE(profiler.GetCompletedRun(*first));
+    REQUIRE_FALSE(profiler.GetCompletedRuns().contains(*first));
     WaitFor(profiler, [&] {
         return profiler.GetRunOverviews().at(*first).status ==
                    RunStatus::kRunning &&
@@ -126,7 +132,8 @@ TEST_CASE("independent runs retain immutable terminated history",
     REQUIRE_FALSE(overview.finish_time);
     REQUIRE(profiler.TerminateRun(*first));
     REQUIRE(profiler.TerminateRun(*first));
-    WaitFor(profiler, [&] { return bool(profiler.GetCompletedRun(*first)); });
+    WaitFor(profiler,
+            [&] { return IsCompleted(profiler.GetRunOverviews().at(*first)); });
     const auto completed = profiler.GetCompletedRun(*first);
     REQUIRE(completed->outcome == RunOutcome::kTerminated);
     REQUIRE(completed->run_id == *first);
@@ -139,7 +146,9 @@ TEST_CASE("independent runs retain immutable terminated history",
             RunStatus::kRunning);
     REQUIRE(profiler.TerminateRun(*first));
     REQUIRE(profiler.TerminateRun(*second));
-    WaitFor(profiler, [&] { return profiler.GetCompletedRuns().size() == 2; });
+    WaitFor(profiler, [&] {
+        return IsCompleted(profiler.GetRunOverviews().at(*second));
+    });
     REQUIRE(profiler.GetCompletedRun(*first) == completed);
     REQUIRE(profiler.GetRunOverviews().size() == 2);
 }
@@ -152,7 +161,9 @@ TEST_CASE("failed launches retain errors and consume run IDs", "[profiler]") {
     const auto target = profiler.AddTarget(MakeTarget("missing", missing));
     const auto result = profiler.StartRun(target);
     REQUIRE(result);
-    WaitFor(profiler, [&] { return bool(profiler.GetCompletedRun(*result)); });
+    WaitFor(profiler, [&] {
+        return IsCompleted(profiler.GetRunOverviews().at(*result));
+    });
     const auto completed = profiler.GetCompletedRun(*result);
     REQUIRE(completed->outcome == RunOutcome::kFailed);
     REQUIRE(completed->error == hemlok::process::ProcessError::kFileNotFound);
@@ -168,7 +179,8 @@ TEST_CASE("failed launches retain errors and consume run IDs", "[profiler]") {
     REQUIRE(*run == *result + 1);
     // Termination queued immediately after launch must work before any Poll.
     REQUIRE(profiler.TerminateRun(*run));
-    WaitFor(profiler, [&] { return bool(profiler.GetCompletedRun(*run)); });
+    WaitFor(profiler,
+            [&] { return IsCompleted(profiler.GetRunOverviews().at(*run)); });
     REQUIRE(profiler.GetCompletedRun(*run)->outcome == RunOutcome::kTerminated);
 }
 
@@ -183,7 +195,9 @@ TEST_CASE("worker observes natural exit without changing UI state until Poll",
     REQUIRE(profiler.GetRunOverviews().at(*result).status ==
             RunStatus::kStarting);
     REQUIRE(profiler.GetCompletedRuns().empty());
-    WaitFor(profiler, [&] { return bool(profiler.GetCompletedRun(*result)); });
+    WaitFor(profiler, [&] {
+        return IsCompleted(profiler.GetRunOverviews().at(*result));
+    });
     const auto run = profiler.GetCompletedRun(*result);
     REQUIRE(run->outcome == RunOutcome::kFinished);
     REQUIRE(run->start_time);
@@ -203,7 +217,9 @@ TEST_CASE("completed results outlive their profiler", "[profiler]") {
         const auto run = profiler.StartRun(target);
         REQUIRE(run);
         REQUIRE(profiler.TerminateRun(*run));
-        WaitFor(profiler, [&] { return bool(profiler.GetCompletedRun(*run)); });
+        WaitFor(profiler, [&] {
+            return IsCompleted(profiler.GetRunOverviews().at(*run));
+        });
         result = profiler.GetCompletedRun(*run);
     }
     REQUIRE(result->outcome == RunOutcome::kTerminated);
@@ -222,8 +238,9 @@ TEST_CASE("generated IDs continue across profiler instances", "[profiler]") {
         const auto run = profiler.StartRun(first_target);
         REQUIRE(run);
         first_run = *run;
-        WaitFor(profiler,
-                [&] { return bool(profiler.GetCompletedRun(first_run)); });
+        WaitFor(profiler, [&] {
+            return IsCompleted(profiler.GetRunOverviews().at(first_run));
+        });
     }
     Profiler profiler;
     const auto target = profiler.AddTarget(MakeTarget("second", missing));
@@ -231,6 +248,7 @@ TEST_CASE("generated IDs continue across profiler instances", "[profiler]") {
     const auto run = profiler.StartRun(target);
     REQUIRE(run);
     REQUIRE(*run == first_run + 1);
-    WaitFor(profiler, [&] { return bool(profiler.GetCompletedRun(*run)); });
+    WaitFor(profiler,
+            [&] { return IsCompleted(profiler.GetRunOverviews().at(*run)); });
 }
 }  // namespace

@@ -23,7 +23,8 @@ public:
     const std::unordered_map<RunId, RunOverview>& GetRunOverviews() const;
     const std::unordered_map<RunId, std::shared_ptr<const CompletedRun>>&
     GetCompletedRuns() const;
-    // The ID must exist. Returns null while the run is ongoing.
+    // The run must be completed; requesting an ongoing or unknown run is a
+    // caller bug.
     std::shared_ptr<const CompletedRun> GetCompletedRun(RunId run) const;
 
 private:
