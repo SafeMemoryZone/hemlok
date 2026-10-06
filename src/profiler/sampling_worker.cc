@@ -70,8 +70,8 @@ void SamplingWorker::HandleCommand(WorkerCommand command) {
     const auto running = run.IsProcessRunning();
     if (running && !*running) {
         Publish({{},
-                 {std::make_shared<const CompletedRun>(
-                     run.Complete(RunOutcome::kFinished, std::nullopt))}});
+                 {std::make_shared<const CompletedRun>(std::move(run).Complete(
+                     RunOutcome::kFinished, std::nullopt))}});
         active_runs_.erase(entry);
         return;
     }
@@ -83,8 +83,8 @@ void SamplingWorker::HandleCommand(WorkerCommand command) {
         return;
     }
     Publish({{},
-             {std::make_shared<const CompletedRun>(
-                 run.Complete(RunOutcome::kTerminated, std::nullopt))}});
+             {std::make_shared<const CompletedRun>(std::move(run).Complete(
+                 RunOutcome::kTerminated, std::nullopt))}});
     active_runs_.erase(entry);
 }
 
@@ -98,8 +98,9 @@ void SamplingWorker::RunLoop(std::stop_token stop) {
             const auto running = run.IsProcessRunning();
             if (running && !*running) {
                 Publish({{},
-                         {std::make_shared<const CompletedRun>(run.Complete(
-                             RunOutcome::kFinished, std::nullopt))}});
+                         {std::make_shared<const CompletedRun>(
+                             std::move(run).Complete(RunOutcome::kFinished,
+                                                     std::nullopt))}});
                 entry = active_runs_.erase(entry);
                 continue;
             }
@@ -116,7 +117,7 @@ void SamplingWorker::RunLoop(std::stop_token stop) {
     for (auto& [id, run] : active_runs_) {
         const auto result = run.TerminateProcess();
         Publish({{},
-                 {std::make_shared<const CompletedRun>(run.Complete(
+                 {std::make_shared<const CompletedRun>(std::move(run).Complete(
                      result ? RunOutcome::kTerminated : RunOutcome::kFailed,
                      result ? std::nullopt
                             : std::optional<process::ProcessError>{

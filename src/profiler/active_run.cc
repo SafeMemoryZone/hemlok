@@ -35,8 +35,8 @@ RunOverview ActiveRun::GetOverview() const {
             start_time_, std::nullopt, std::nullopt};
 }
 
-CompletedRun ActiveRun::Complete(RunOutcome outcome,
-                                 std::optional<process::ProcessError> error) {
+CompletedRun ActiveRun::Complete(
+    RunOutcome outcome, std::optional<process::ProcessError> error) && {
     return {run_id_,
             target_id_,
             outcome,

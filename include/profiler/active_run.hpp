@@ -20,7 +20,7 @@ public:
     RunOverview GetOverview() const;
     // Consumes results; the worker removes this run after completion.
     CompletedRun Complete(RunOutcome outcome,
-                          std::optional<process::ProcessError> error);
+                          std::optional<process::ProcessError> error) &&;
 
 private:
     ActiveRun(RunId run, TargetId target, process::Process process);

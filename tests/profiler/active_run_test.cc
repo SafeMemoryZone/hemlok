@@ -1,9 +1,18 @@
 #include <catch2/catch_test_macros.hpp>
 #include <profiler/active_run.hpp>
+#include <type_traits>
 #include <utility>
 
 namespace {
 using namespace hemlok::profiler;
+
+static_assert(
+    std::is_invocable_v<decltype(&ActiveRun::Complete), ActiveRun&&, RunOutcome,
+                        std::optional<hemlok::process::ProcessError>>);
+static_assert(
+    !std::is_invocable_v<decltype(&ActiveRun::Complete), ActiveRun&, RunOutcome,
+                         std::optional<hemlok::process::ProcessError>>);
+
 TEST_CASE("active runs expose metadata and move results into completion",
           "[profiler]") {
     auto process = hemlok::process::Process::CreateFromExecutable(
@@ -25,7 +34,8 @@ TEST_CASE("active runs expose metadata and move results into completion",
     const auto stopped = run.IsProcessRunning();
     REQUIRE(stopped);
     REQUIRE_FALSE(*stopped);
-    const auto completed = run.Complete(RunOutcome::kTerminated, std::nullopt);
+    const auto completed =
+        std::move(run).Complete(RunOutcome::kTerminated, std::nullopt);
     REQUIRE(completed.run_id == 7);
     REQUIRE(completed.target_id == 3);
     REQUIRE(completed.start_time == overview.start_time);
