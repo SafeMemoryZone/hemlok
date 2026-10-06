@@ -2,7 +2,7 @@
 #define HEMLOK_PROFILER_PROFILER_HPP_
 
 #include <expected>
-#include <profiler/profiler_worker.hpp>
+#include <profiler/sampling_worker.hpp>
 #include <profiler/target.hpp>
 #include <unordered_map>
 
@@ -38,7 +38,7 @@ private:
     RunOverviewMap run_overviews_;
     CommandChannel commands_;
     PublicationChannel publications_;
-    ProfilerWorker worker_;
+    SamplingWorker worker_;
 };
 }  // namespace hemlok::profiler
 

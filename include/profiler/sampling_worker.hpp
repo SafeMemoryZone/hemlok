@@ -1,5 +1,5 @@
-#ifndef HEMLOK_PROFILER_PROFILER_WORKER_HPP_
-#define HEMLOK_PROFILER_PROFILER_WORKER_HPP_
+#ifndef HEMLOK_PROFILER_SAMPLING_WORKER_HPP_
+#define HEMLOK_PROFILER_SAMPLING_WORKER_HPP_
 
 #include <profiler/active_run.hpp>
 #include <profiler/worker_command.hpp>
@@ -9,11 +9,11 @@
 
 namespace hemlok::profiler {
 using ActiveRunMap = std::unordered_map<RunId, ActiveRun>;
-class ProfilerWorker {
+class SamplingWorker {
 public:
     // Both channels must outlive the worker.
-    ProfilerWorker(CommandChannel& commands, PublicationChannel& publications);
-    ~ProfilerWorker();
+    SamplingWorker(CommandChannel& commands, PublicationChannel& publications);
+    ~SamplingWorker();
     void Shutdown();
 
 private:
@@ -28,4 +28,4 @@ private:
 };
 }  // namespace hemlok::profiler
 
-#endif  // HEMLOK_PROFILER_PROFILER_WORKER_HPP_
+#endif  // HEMLOK_PROFILER_SAMPLING_WORKER_HPP_

@@ -1,23 +1,23 @@
-#include <profiler/profiler_worker.hpp>
+#include <profiler/sampling_worker.hpp>
 #include <utility>
 
 namespace hemlok::profiler {
-ProfilerWorker::ProfilerWorker(CommandChannel& commands,
+SamplingWorker::SamplingWorker(CommandChannel& commands,
                                PublicationChannel& publications)
     : commands_(commands),
       publications_(publications),
       thread_([this](std::stop_token stop) { RunLoop(stop); }) {}
 
-ProfilerWorker::~ProfilerWorker() { Shutdown(); }
+SamplingWorker::~SamplingWorker() { Shutdown(); }
 
-void ProfilerWorker::Shutdown() {
+void SamplingWorker::Shutdown() {
     thread_.request_stop();
     if (thread_.joinable()) {
         thread_.join();
     }
 }
 
-void ProfilerWorker::Publish(WorkerPublication publication) {
+void SamplingWorker::Publish(WorkerPublication publication) {
     for (const auto& run : publication.completed_runs) {
         RunStatus status = RunStatus::kFailed;
         switch (run->outcome) {
@@ -37,7 +37,7 @@ void ProfilerWorker::Publish(WorkerPublication publication) {
     publications_.Send(std::move(publication));
 }
 
-void ProfilerWorker::HandleCommand(WorkerCommand command) {
+void SamplingWorker::HandleCommand(WorkerCommand command) {
     if (const auto* start = std::get_if<StartRunCommand>(&command)) {
         auto process =
             process::Process::CreateFromExecutable(start->executable_path);
@@ -87,7 +87,7 @@ void ProfilerWorker::HandleCommand(WorkerCommand command) {
     active_runs_.erase(entry);
 }
 
-void ProfilerWorker::RunLoop(std::stop_token stop) {
+void SamplingWorker::RunLoop(std::stop_token stop) {
     while (!stop.stop_requested()) {
         for (auto& command : commands_.TakeAll()) {
             HandleCommand(std::move(command));

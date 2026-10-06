@@ -1,5 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
-#include <profiler/profiler_worker.hpp>
+#include <profiler/sampling_worker.hpp>
 #include <thread>
 
 namespace {
@@ -8,7 +8,7 @@ TEST_CASE("worker shutdown completes active processes and is repeatable",
     using namespace hemlok::profiler;
     CommandChannel commands;
     PublicationChannel publications;
-    ProfilerWorker worker(commands, publications);
+    SamplingWorker worker(commands, publications);
     commands.Send(StartRunCommand{4, 2, HEMLOK_PROCESS_FIXTURE_PATH});
     bool started = false;
     const auto deadline =
