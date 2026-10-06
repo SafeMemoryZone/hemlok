@@ -8,9 +8,6 @@
 #include <unordered_map>
 
 namespace hemlok::profiler {
-using TargetMap = std::unordered_map<TargetId, Target>;
-using RunMap = std::unordered_map<RunId, std::shared_ptr<const CompletedRun>>;
-using RunOverviewMap = std::unordered_map<RunId, RunOverview>;
 // Main-thread facade. Process operations and their errors arrive via Poll().
 class Profiler {
 public:
@@ -22,21 +19,21 @@ public:
     std::expected<void, process::ProcessError> TerminateRun(RunId run);
     // Drains the publication queue; never queries or controls processes.
     void Poll();
-    const TargetMap& GetTargets() const;
-    const RunOverviewMap& GetRunOverviews() const;
-    const RunMap& GetCompletedRuns() const;
+    const std::unordered_map<TargetId, Target>& GetTargets() const;
+    const std::unordered_map<RunId, RunOverview>& GetRunOverviews() const;
+    const std::unordered_map<RunId, std::shared_ptr<const CompletedRun>>&
+    GetCompletedRuns() const;
     // The ID must exist. Returns null while the run is ongoing.
     std::shared_ptr<const CompletedRun> GetCompletedRun(RunId run) const;
 
 private:
-    TargetId GetNextTargetId();
-    RunId GetNextRunId();
+    static TargetId GenerateTargetId();
+    static RunId GenerateRunId();
     void ApplyPublication(WorkerPublication publication);
-    TargetId next_target_id_ = 0;
-    RunId next_run_id_ = 0;
-    TargetMap targets_;
-    RunMap completed_runs_;
-    RunOverviewMap run_overviews_;
+    std::unordered_map<TargetId, Target> targets_;
+    std::unordered_map<RunId, std::shared_ptr<const CompletedRun>>
+        completed_runs_;
+    std::unordered_map<RunId, RunOverview> run_overviews_;
     CommandChannel commands_;
     PublicationChannel publications_;
     SamplingWorker worker_;

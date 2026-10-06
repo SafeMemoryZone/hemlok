@@ -28,13 +28,12 @@ TEST_CASE("a profiler stores a named target", "[profiler]") {
     const std::filesystem::path executable_path = "/usr/bin/example";
 
     const auto id = profiler.AddTarget(MakeTarget("example", executable_path));
-    REQUIRE(id == 0);
 
     const auto& targets = profiler.GetTargets();
     REQUIRE(targets.size() == 1);
-    REQUIRE(targets.contains(0));
-    REQUIRE(targets.at(0).GetName() == std::optional<std::string>{"example"});
-    REQUIRE(targets.at(0).GetExecutablePath() == executable_path);
+    REQUIRE(targets.contains(id));
+    REQUIRE(targets.at(id).GetName() == std::optional<std::string>{"example"});
+    REQUIRE(targets.at(id).GetExecutablePath() == executable_path);
 }
 
 TEST_CASE("a profiler stores a target without a name", "[profiler]") {
@@ -42,9 +41,8 @@ TEST_CASE("a profiler stores a target without a name", "[profiler]") {
 
     const auto id =
         profiler.AddTarget(MakeTarget(std::nullopt, "/usr/bin/unnamed"));
-    REQUIRE(id == 0);
 
-    const auto& target = profiler.GetTargets().at(0);
+    const auto& target = profiler.GetTargets().at(id);
     REQUIRE_FALSE(target.GetName().has_value());
     REQUIRE(target.GetExecutablePath() == "/usr/bin/unnamed");
 }
@@ -53,17 +51,17 @@ TEST_CASE("a profiler assigns consecutive target IDs", "[profiler]") {
     Profiler profiler;
 
     const auto first = profiler.AddTarget(MakeTarget("first", "/bin/first"));
-    REQUIRE(first == 0);
     const auto second = profiler.AddTarget(MakeTarget("second", "/bin/second"));
-    REQUIRE(second == 1);
+    REQUIRE(second == first + 1);
     const auto third = profiler.AddTarget(MakeTarget("third", "/bin/third"));
-    REQUIRE(third == 2);
+    REQUIRE(third == second + 1);
 
     const auto& targets = profiler.GetTargets();
     REQUIRE(targets.size() == 3);
-    REQUIRE(targets.at(0).GetName() == std::optional<std::string>{"first"});
-    REQUIRE(targets.at(1).GetName() == std::optional<std::string>{"second"});
-    REQUIRE(targets.at(2).GetName() == std::optional<std::string>{"third"});
+    REQUIRE(targets.at(first).GetName() == std::optional<std::string>{"first"});
+    REQUIRE(targets.at(second).GetName() ==
+            std::optional<std::string>{"second"});
+    REQUIRE(targets.at(third).GetName() == std::optional<std::string>{"third"});
 }
 
 TEST_CASE("existing target references observe newly added targets",
@@ -71,10 +69,10 @@ TEST_CASE("existing target references observe newly added targets",
     Profiler profiler;
     const auto& targets = profiler.GetTargets();
 
-    REQUIRE(profiler.AddTarget(MakeTarget("later", "/bin/later")) == 0);
+    const auto id = profiler.AddTarget(MakeTarget("later", "/bin/later"));
 
     REQUIRE(targets.size() == 1);
-    REQUIRE(targets.at(0).GetName() == std::optional<std::string>{"later"});
+    REQUIRE(targets.at(id).GetName() == std::optional<std::string>{"later"});
 }
 
 TEST_CASE("duplicate target configurations receive distinct IDs",
@@ -111,8 +109,7 @@ TEST_CASE("independent runs retain immutable terminated history",
     const auto second = profiler.StartRun(target);
     REQUIRE(first.has_value());
     REQUIRE(second.has_value());
-    REQUIRE(*first == 0);
-    REQUIRE(*second == 1);
+    REQUIRE(*second == *first + 1);
     REQUIRE(profiler.GetRunOverviews().at(*first).status ==
             RunStatus::kStarting);
     REQUIRE_FALSE(profiler.GetCompletedRun(*first));
@@ -168,7 +165,7 @@ TEST_CASE("failed launches retain errors and consume run IDs", "[profiler]") {
         profiler.AddTarget(MakeTarget("worker", HEMLOK_PROCESS_FIXTURE_PATH));
     const auto run = profiler.StartRun(valid);
     REQUIRE(run);
-    REQUIRE(*run == 1);
+    REQUIRE(*run == *result + 1);
     // Termination queued immediately after launch must work before any Poll.
     REQUIRE(profiler.TerminateRun(*run));
     WaitFor(profiler, [&] { return bool(profiler.GetCompletedRun(*run)); });
@@ -211,5 +208,29 @@ TEST_CASE("completed results outlive their profiler", "[profiler]") {
     }
     REQUIRE(result->outcome == RunOutcome::kTerminated);
     REQUIRE(result->finish_time >= *result->start_time);
+}
+
+TEST_CASE("generated IDs continue across profiler instances", "[profiler]") {
+    hemlok::profiler::TargetId first_target;
+    hemlok::profiler::RunId first_run;
+    const auto missing =
+        std::filesystem::current_path() / "hemlok-missing-run-executable";
+    REQUIRE_FALSE(std::filesystem::exists(missing));
+    {
+        Profiler profiler;
+        first_target = profiler.AddTarget(MakeTarget("first", missing));
+        const auto run = profiler.StartRun(first_target);
+        REQUIRE(run);
+        first_run = *run;
+        WaitFor(profiler,
+                [&] { return bool(profiler.GetCompletedRun(first_run)); });
+    }
+    Profiler profiler;
+    const auto target = profiler.AddTarget(MakeTarget("second", missing));
+    REQUIRE(target == first_target + 1);
+    const auto run = profiler.StartRun(target);
+    REQUIRE(run);
+    REQUIRE(*run == first_run + 1);
+    WaitFor(profiler, [&] { return bool(profiler.GetCompletedRun(*run)); });
 }
 }  // namespace
