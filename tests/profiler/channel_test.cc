@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <future>
 #include <memory>
 #include <profiler/channel.hpp>
 #include <thread>
@@ -36,5 +37,60 @@ TEST_CASE("concurrent sends and drains preserve every message",
         std::this_thread::yield();
     }
     REQUIRE(received.size() == 4000);
+}
+
+TEST_CASE("queued messages satisfy a channel wait immediately",
+          "[profiler][channel]") {
+    hemlok::profiler::Channel<int> channel;
+    channel.Send(7);
+    channel.Wait(std::stop_token{});
+    const auto messages = channel.TakeAll();
+    REQUIRE(messages == std::vector<int>{7});
+}
+
+TEST_CASE("sending wakes an idle or timed channel wait",
+          "[profiler][channel]") {
+    hemlok::profiler::Channel<int> channel;
+    std::optional<std::chrono::milliseconds> timeout;
+    SECTION("idle wait") {}
+    SECTION("timed wait") { timeout = std::chrono::seconds{30}; }
+    std::promise<void> finished;
+    auto result = finished.get_future();
+    std::jthread waiter([&](std::stop_token stop) {
+        channel.Wait(stop, timeout);
+        finished.set_value();
+    });
+    REQUIRE(result.wait_for(std::chrono::milliseconds{20}) ==
+            std::future_status::timeout);
+    channel.Send(7);
+    REQUIRE(result.wait_for(std::chrono::seconds{5}) ==
+            std::future_status::ready);
+    REQUIRE(channel.TakeAll() == std::vector<int>{7});
+}
+
+TEST_CASE("shutdown interrupts an idle channel wait", "[profiler][channel]") {
+    hemlok::profiler::Channel<int> channel;
+    std::promise<void> finished;
+    auto result = finished.get_future();
+    std::jthread waiter([&](std::stop_token stop) {
+        channel.Wait(stop);
+        finished.set_value();
+    });
+    REQUIRE(result.wait_for(std::chrono::milliseconds{20}) ==
+            std::future_status::timeout);
+    waiter.request_stop();
+    REQUIRE(result.wait_for(std::chrono::seconds{5}) ==
+            std::future_status::ready);
+    REQUIRE(channel.TakeAll().empty());
+}
+
+TEST_CASE("timed channel waits return without a message",
+          "[profiler][channel]") {
+    hemlok::profiler::Channel<int> channel;
+    const auto before = std::chrono::steady_clock::now();
+    channel.Wait(std::stop_token{}, std::chrono::milliseconds{20});
+    REQUIRE(std::chrono::steady_clock::now() - before >=
+            std::chrono::milliseconds{20});
+    REQUIRE(channel.TakeAll().empty());
 }
 }  // namespace

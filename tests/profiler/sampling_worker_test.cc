@@ -34,4 +34,14 @@ TEST_CASE("worker shutdown completes active processes and is repeatable",
     REQUIRE_FALSE(completed->error);
     REQUIRE(publications.TakeAll().empty());
 }
+
+TEST_CASE("an idle worker shuts down without a command", "[profiler][worker]") {
+    using namespace hemlok::profiler;
+    CommandChannel commands;
+    PublicationChannel publications;
+    SamplingWorker worker(commands, publications);
+    worker.Shutdown();
+    worker.Shutdown();
+    REQUIRE(publications.TakeAll().empty());
+}
 }  // namespace

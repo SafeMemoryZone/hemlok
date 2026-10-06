@@ -90,6 +90,13 @@ void SamplingWorker::HandleCommand(WorkerCommand command) {
 
 void SamplingWorker::RunLoop(std::stop_token stop) {
     while (!stop.stop_requested()) {
+        commands_.Wait(stop,
+                       active_runs_.empty()
+                           ? std::nullopt
+                           : std::optional{std::chrono::milliseconds{10}});
+        if (stop.stop_requested()) {
+            break;
+        }
         for (auto& command : commands_.TakeAll()) {
             HandleCommand(std::move(command));
         }
@@ -111,7 +118,6 @@ void SamplingWorker::RunLoop(std::stop_token stop) {
             Publish({{std::move(overview)}, {}});
             ++entry;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds{10});
     }
     // Destroy and stop processes on their owning thread, before channels die.
     for (auto& [id, run] : active_runs_) {
