@@ -2,6 +2,7 @@
 #define HEMLOK_PROFILER_PROFILER_HPP_
 
 #include <expected>
+#include <process/process.hpp>
 #include <profiler/sampling_worker.hpp>
 #include <profiler/target.hpp>
 #include <unordered_map>
@@ -16,9 +17,9 @@ public:
     Profiler();
     TargetId AddTarget(Target target);
     // Success means the command was queued, not that the process has launched.
-    std::expected<RunId, Error> StartRun(TargetId target);
+    std::expected<RunId, process::ProcessError> StartRun(TargetId target);
     // Termination failures are reported in the run overview after Poll().
-    std::expected<void, Error> TerminateRun(RunId run);
+    std::expected<void, process::ProcessError> TerminateRun(RunId run);
     // Drains the publication queue; never queries or controls processes.
     void Poll();
     const TargetMap& GetTargets() const;

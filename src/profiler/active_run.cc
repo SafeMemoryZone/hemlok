@@ -1,3 +1,4 @@
+#include <process/process.hpp>
 #include <profiler/active_run.hpp>
 #include <utility>
 
@@ -17,15 +18,17 @@ RunId ActiveRun::GetRunId() const { return run_id_; }
 
 TargetId ActiveRun::GetTargetId() const { return target_id_; }
 
-std::expected<bool, Error> ActiveRun::IsProcessRunning() {
+std::expected<bool, process::ProcessError> ActiveRun::IsProcessRunning() {
     return process_.IsRunning();
 }
 
-std::expected<void, Error> ActiveRun::TerminateProcess() {
+std::expected<void, process::ProcessError> ActiveRun::TerminateProcess() {
     return process_.Terminate();
 }
 
-std::expected<void, Error> ActiveRun::CollectSamples() { return {}; }
+std::expected<void, process::ProcessError> ActiveRun::CollectSamples() {
+    return {};
+}
 
 RunOverview ActiveRun::GetOverview() const {
     return {run_id_,     target_id_,   RunStatus::kRunning,
@@ -33,7 +36,7 @@ RunOverview ActiveRun::GetOverview() const {
 }
 
 CompletedRun ActiveRun::Complete(RunOutcome outcome,
-                                 std::optional<Error> error) {
+                                 std::optional<process::ProcessError> error) {
     return {run_id_,
             target_id_,
             outcome,

@@ -1,3 +1,4 @@
+#include <process/process.hpp>
 #include <profiler/sampling_worker.hpp>
 #include <utility>
 
@@ -118,7 +119,8 @@ void SamplingWorker::RunLoop(std::stop_token stop) {
                  {std::make_shared<const CompletedRun>(run.Complete(
                      result ? RunOutcome::kTerminated : RunOutcome::kFailed,
                      result ? std::nullopt
-                            : std::optional<Error>{result.error()}))}});
+                            : std::optional<process::ProcessError>{
+                                  result.error()}))}});
     }
     active_runs_.clear();
 }

@@ -1,4 +1,5 @@
 #include <cassert>
+#include <process/process.hpp>
 #include <profiler/profiler.hpp>
 #include <utility>
 namespace hemlok::profiler {
@@ -10,7 +11,8 @@ TargetId Profiler::AddTarget(Target target) {
     targets_.emplace(id, std::move(target));
     return id;
 }
-std::expected<RunId, Error> Profiler::StartRun(TargetId target) {
+std::expected<RunId, process::ProcessError> Profiler::StartRun(
+    TargetId target) {
     const auto entry = targets_.find(target);
     assert(entry != targets_.end());
     const auto id = GetNextRunId();
@@ -21,7 +23,7 @@ std::expected<RunId, Error> Profiler::StartRun(TargetId target) {
         StartRunCommand{id, target, entry->second.GetExecutablePath()});
     return id;
 }
-std::expected<void, Error> Profiler::TerminateRun(RunId run) {
+std::expected<void, process::ProcessError> Profiler::TerminateRun(RunId run) {
     assert(run_overviews_.contains(run));
     if (!completed_runs_.contains(run)) {
         commands_.Send(TerminateRunCommand{run});
