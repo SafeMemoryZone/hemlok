@@ -10,7 +10,7 @@
 #include <ctime>
 #include <filesystem>
 #include <optional>
-#include <profiler/profiling_target.hpp>
+#include <profiler/target.hpp>
 #include <string>
 #include <system_error>
 #include <ui/profiler_ui.hpp>
@@ -99,8 +99,7 @@ int ProfilerUi::Start() {
 }
 
 void ProfilerUi::Draw() {
-    profiler_
-        .Poll();  // NOTE: this will eventually be done by the sampling worker
+    profiler_.Poll();
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
@@ -195,8 +194,8 @@ bool ProfilerUi::AddTarget() {
     if (target_name_[0] != '\0') {
         name.emplace(target_name_.data());
     }
-    auto target = profiler::ProfilingTarget::Create(std::move(name),
-                                                    std::move(executable_path));
+    auto target =
+        profiler::Target::Create(std::move(name), std::move(executable_path));
     if (!target) {
         switch (target.error()) {
             case profiler::TargetError::kBlankName:
@@ -217,7 +216,7 @@ bool ProfilerUi::AddTarget() {
 }
 
 void ProfilerUi::DrawTargetDetails(profiler::TargetId id,
-                                   const profiler::ProfilingTarget& target) {
+                                   const profiler::Target& target) {
     ImGui::PushTextWrapPos(0.0F);
     if (target.GetName().has_value()) {
         ImGui::TextDisabled("Name");
@@ -235,23 +234,7 @@ void ProfilerUi::DrawTargetDetails(profiler::TargetId id,
         const auto result = profiler_.StartRun(id);
         run_error_ = nullptr;
         if (!result) {
-            switch (result.error()) {
-                case profiler::ProfilerError::kProcessStartFailed:
-                    run_error_ =
-                        "Could not start the executable. Check its path and "
-                        "permissions.";
-                    break;
-                case profiler::ProfilerError::kProcessTerminated:
-                    run_error_ =
-                        "The process exited before the run could start.";
-                    break;
-                case profiler::ProfilerError::kStatusQueryFailed:
-                    run_error_ = "Could not query the process status.";
-                    break;
-                case profiler::ProfilerError::kTerminationFailed:
-                    run_error_ = "Could not terminate the process.";
-                    break;
-            }
+            run_error_ = "Could not queue the run.";
         }
     }
     DrawRuns(id);
@@ -265,8 +248,8 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
     ImGui::SeparatorText("Runs");
     ImGui::PopStyleVar();
     std::vector<profiler::RunId> run_ids;
-    for (const auto& [id, entry] : profiler_.GetRuns()) {
-        if (entry.id == target) {
+    for (const auto& [id, entry] : profiler_.GetRunOverviews()) {
+        if (entry.target_id == target) {
             run_ids.push_back(id);
         }
     }
@@ -299,7 +282,7 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
     // Number runs in creation order within this target, newest first.
     std::size_t run_number = run_ids.size();
     for (const auto id : run_ids) {
-        const auto& run = profiler_.GetRuns().at(id).profiling_run;
+        const auto& run = profiler_.GetRunOverviews().at(id);
         const std::string widget_id = std::to_string(id);
         const std::string label = "#" + std::to_string(run_number--);
         ImGui::PushID(widget_id.c_str());
@@ -307,34 +290,77 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
         ImGui::TableNextColumn();
         ImGui::TextUnformatted(label.c_str());
         ImGui::TableNextColumn();
-        if (const auto error = run.GetPollError()) {
-            ImGui::TextColored(ImVec4(1.0F, 0.7F, 0.2F, 1.0F), "Status stale");
+        const char* status = "Starting";
+        switch (run.status) {
+            case profiler::RunStatus::kStarting:
+                break;
+            case profiler::RunStatus::kRunning:
+                status = "Running";
+                break;
+            case profiler::RunStatus::kFinished:
+                status = "Finished";
+                break;
+            case profiler::RunStatus::kTerminated:
+                status = "Terminated";
+                break;
+            case profiler::RunStatus::kFailed:
+                status = "Failed";
+                break;
+        }
+        ImGui::TextUnformatted(status);
+        if (run.error) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0F, 0.7F, 0.2F, 1.0F), "Error");
             if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
-                    *error == process::ProcessError::kPermissionDenied
-                        ? "Permission denied while checking process status. "
-                          "Retrying."
-                        : "Could not check process status. Retrying.");
+                switch (*run.error) {
+                    case process::ProcessError::kFileNotFound:
+                        ImGui::SetTooltip("Executable not found.");
+                        break;
+                    case process::ProcessError::kPermissionDenied:
+                        ImGui::SetTooltip("Permission denied.");
+                        break;
+                    case process::ProcessError::kInvalidExecutable:
+                        ImGui::SetTooltip("Invalid executable.");
+                        break;
+                    case process::ProcessError::kStartFailed:
+                        ImGui::SetTooltip("Could not start the process.");
+                        break;
+                    case process::ProcessError::kTerminationFailed:
+                        ImGui::SetTooltip("Could not terminate the process.");
+                        break;
+                    case process::ProcessError::kStatusQueryFailed:
+                        ImGui::SetTooltip(
+                            "Could not check process status. Retrying.");
+                        break;
+                }
             }
-        } else {
-            ImGui::TextUnformatted(run.IsRunning() ? "Running" : "Finished");
         }
         ImGui::TableNextColumn();
-        draw_time(run.GetStartTime());
+        if (run.start_time) {
+            draw_time(*run.start_time);
+        } else {
+            ImGui::TextUnformatted("--");
+        }
         ImGui::TableNextColumn();
-        if (run.GetFinishTime()) {
-            draw_time(*run.GetFinishTime());
+        if (run.finish_time) {
+            draw_time(*run.finish_time);
         } else {
             ImGui::TextUnformatted("--");
         }
         ImGui::TableNextColumn();
         const auto end =
-            run.GetFinishTime().value_or(std::chrono::system_clock::now());
-        const double seconds =
-            std::chrono::duration<double>(end - run.GetStartTime()).count();
-        ImGui::Text("%.2f s", std::max(0.0, seconds));
+            run.finish_time.value_or(std::chrono::system_clock::now());
+        if (run.start_time) {
+            const double seconds =
+                std::chrono::duration<double>(end - *run.start_time).count();
+            ImGui::Text("%.2f s", std::max(0.0, seconds));
+        } else {
+            ImGui::TextUnformatted("--");
+        }
         ImGui::TableNextColumn();
-        if (run.IsRunning() && ImGui::Button("Terminate")) {
+        if ((run.status == profiler::RunStatus::kStarting ||
+             run.status == profiler::RunStatus::kRunning) &&
+            ImGui::Button("Terminate")) {
             run_error_ = profiler_.TerminateRun(id)
                              ? nullptr
                              : "Could not terminate the process.";

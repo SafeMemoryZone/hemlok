@@ -53,6 +53,7 @@ if(HEMLOK_BUILD_TESTS)
 endif()
 
 find_package(OpenGL REQUIRED)
+find_package(Threads REQUIRED)
 
 add_library(imgui STATIC
     ${imgui_SOURCE_DIR}/imgui.cpp
@@ -85,7 +86,7 @@ target_include_directories(hemlok_lib PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 target_link_libraries(hemlok_lib
-    PUBLIC Boost::process
+    PUBLIC Boost::process Threads::Threads
     PRIVATE imgui Boost::scope
 )
 

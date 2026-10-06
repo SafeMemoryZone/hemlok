@@ -28,7 +28,7 @@ private:
     void Draw();
     bool AddTarget();
     void DrawTargetDetails(profiler::TargetId id,
-                           const profiler::ProfilingTarget& target);
+                           const profiler::Target& target);
     void DrawRuns(profiler::TargetId target);
     void Shutdown();
 
