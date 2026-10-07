@@ -18,7 +18,7 @@ void SamplingWorker::Shutdown() {
     }
 }
 
-void SamplingWorker::Publish(WorkerPublication publication) {
+void SamplingWorker::FillCompletedRunOverviews(WorkerPublication& publication) {
     for (const auto& run : publication.completed_runs) {
         RunStatus status = RunStatus::kFailed;
         switch (run->outcome) {
@@ -35,6 +35,9 @@ void SamplingWorker::Publish(WorkerPublication publication) {
                                                  status, run->start_time,
                                                  run->finish_time, run->error});
     }
+}
+
+void SamplingWorker::Publish(WorkerPublication publication) {
     publications_.Send(std::move(publication));
 }
 
@@ -43,15 +46,18 @@ void SamplingWorker::HandleCommand(WorkerCommand command) {
         auto process =
             process::Process::CreateFromExecutable(start->executable_path);
         if (!process) {
-            Publish({{},
-                     {std::make_shared<const CompletedRun>(
-                         CompletedRun{start->run_id,
-                                      start->target_id,
-                                      RunOutcome::kFailed,
-                                      process.error(),
-                                      std::nullopt,
-                                      std::chrono::system_clock::now(),
-                                      {}})}});
+            WorkerPublication publication = {
+                {},
+                {std::make_shared<const CompletedRun>(
+                    CompletedRun{start->run_id,
+                                 start->target_id,
+                                 RunOutcome::kFailed,
+                                 process.error(),
+                                 std::nullopt,
+                                 std::chrono::system_clock::now(),
+                                 {}})}};
+            FillCompletedRunOverviews(publication);
+            Publish(std::move(publication));
             return;
         }
         auto run = ActiveRun::Create(start->run_id, start->target_id,
@@ -69,9 +75,12 @@ void SamplingWorker::HandleCommand(WorkerCommand command) {
     auto& run = entry->second;
     const auto running = run.IsProcessRunning();
     if (running && !*running) {
-        Publish({{},
-                 {std::make_shared<const CompletedRun>(std::move(run).Complete(
-                     RunOutcome::kFinished, std::nullopt))}});
+        WorkerPublication publication = {
+            {},
+            {std::make_shared<const CompletedRun>(
+                std::move(run).Complete(RunOutcome::kFinished, std::nullopt))}};
+        FillCompletedRunOverviews(publication);
+        Publish(std::move(publication));
         active_runs_.erase(entry);
         return;
     }
@@ -82,9 +91,12 @@ void SamplingWorker::HandleCommand(WorkerCommand command) {
         Publish({{std::move(overview)}, {}});
         return;
     }
-    Publish({{},
-             {std::make_shared<const CompletedRun>(std::move(run).Complete(
-                 RunOutcome::kTerminated, std::nullopt))}});
+    WorkerPublication publication = {
+        {},
+        {std::make_shared<const CompletedRun>(
+            std::move(run).Complete(RunOutcome::kTerminated, std::nullopt))}};
+    FillCompletedRunOverviews(publication);
+    Publish(std::move(publication));
     active_runs_.erase(entry);
 }
 
@@ -104,10 +116,13 @@ void SamplingWorker::RunLoop(std::stop_token stop) {
             auto& run = entry->second;
             const auto running = run.IsProcessRunning();
             if (running && !*running) {
-                Publish({{},
-                         {std::make_shared<const CompletedRun>(
-                             std::move(run).Complete(RunOutcome::kFinished,
-                                                     std::nullopt))}});
+                WorkerPublication publication = {
+                    {},
+                    {std::make_shared<const CompletedRun>(
+                        std::move(run).Complete(RunOutcome::kFinished,
+                                                std::nullopt))}};
+                FillCompletedRunOverviews(publication);
+                Publish(std::move(publication));
                 entry = active_runs_.erase(entry);
                 continue;
             }
@@ -122,12 +137,15 @@ void SamplingWorker::RunLoop(std::stop_token stop) {
     // Destroy and stop processes on their owning thread, before channels die.
     for (auto& [id, run] : active_runs_) {
         const auto result = run.TerminateProcess();
-        Publish({{},
-                 {std::make_shared<const CompletedRun>(std::move(run).Complete(
-                     result ? RunOutcome::kTerminated : RunOutcome::kFailed,
-                     result ? std::nullopt
-                            : std::optional<process::ProcessError>{
-                                  result.error()}))}});
+        WorkerPublication publication = {
+            {},
+            {std::make_shared<const CompletedRun>(std::move(run).Complete(
+                result ? RunOutcome::kTerminated : RunOutcome::kFailed,
+                result
+                    ? std::nullopt
+                    : std::optional<process::ProcessError>{result.error()}))}};
+        FillCompletedRunOverviews(publication);
+        Publish(std::move(publication));
     }
     active_runs_.clear();
 }
