@@ -20,8 +20,6 @@ private:
     void RunLoop(std::stop_token stop);
     void HandleCommand(WorkerCommand command);
     void Publish(WorkerPublication publication);
-    void PublishOverview(RunOverview overview);
-    void PublishCompletedRun(CompletedRun run);
     ActiveRunMap active_runs_;
     CommandChannel& commands_;
     PublicationChannel& publications_;
