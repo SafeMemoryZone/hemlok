@@ -24,7 +24,7 @@ TEST_CASE("worker shutdown completes active processes and is repeatable",
     REQUIRE(started);
     worker.Shutdown();
     worker.Shutdown();
-    std::shared_ptr<const CompletedRun> completed;
+    std::optional<CompletedRun> completed;
     for (const auto& publication : publications.TakeAll()) {
         for (const auto& run : publication.completed_runs) completed = run;
     }

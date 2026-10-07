@@ -55,7 +55,7 @@ void Profiler::ApplyPublication(WorkerPublication publication) {
         run_overviews_.insert_or_assign(overview.run_id, std::move(overview));
     }
     for (auto& run : publication.completed_runs) {
-        const auto id = run->run_id;
+        const auto id = run.run_id;
         completed_runs_.insert_or_assign(id, std::move(run));
     }
 }
@@ -69,12 +69,12 @@ const std::unordered_map<RunId, RunOverview>& Profiler::GetRunOverviews()
     return run_overviews_;
 }
 
-const std::unordered_map<RunId, std::shared_ptr<const CompletedRun>>&
-Profiler::GetCompletedRuns() const {
+const std::unordered_map<RunId, CompletedRun>& Profiler::GetCompletedRuns()
+    const {
     return completed_runs_;
 }
 
-std::shared_ptr<const CompletedRun> Profiler::GetCompletedRun(RunId run) const {
+const CompletedRun& Profiler::GetCompletedRun(RunId run) const {
     const auto entry = completed_runs_.find(run);
     assert(entry != completed_runs_.end());
     return entry->second;

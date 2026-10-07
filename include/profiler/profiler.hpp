@@ -21,19 +21,17 @@ public:
     void Poll();
     const std::unordered_map<TargetId, Target>& GetTargets() const;
     const std::unordered_map<RunId, RunOverview>& GetRunOverviews() const;
-    const std::unordered_map<RunId, std::shared_ptr<const CompletedRun>>&
-    GetCompletedRuns() const;
+    const std::unordered_map<RunId, CompletedRun>& GetCompletedRuns() const;
     // The run must be completed; requesting an ongoing or unknown run is a
     // caller bug.
-    std::shared_ptr<const CompletedRun> GetCompletedRun(RunId run) const;
+    const CompletedRun& GetCompletedRun(RunId run) const;
 
 private:
     static TargetId GenerateTargetId();
     static RunId GenerateRunId();
     void ApplyPublication(WorkerPublication publication);
     std::unordered_map<TargetId, Target> targets_;
-    std::unordered_map<RunId, std::shared_ptr<const CompletedRun>>
-        completed_runs_;
+    std::unordered_map<RunId, CompletedRun> completed_runs_;
     std::unordered_map<RunId, RunOverview> run_overviews_;
     CommandChannel commands_;
     PublicationChannel publications_;

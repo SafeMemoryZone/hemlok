@@ -21,7 +21,7 @@ void SamplingWorker::Shutdown() {
 void SamplingWorker::FillCompletedRunOverviews(WorkerPublication& publication) {
     for (const auto& run : publication.completed_runs) {
         RunStatus status = RunStatus::kFailed;
-        switch (run->outcome) {
+        switch (run.outcome) {
             case RunOutcome::kFinished:
                 status = RunStatus::kFinished;
                 break;
@@ -31,9 +31,9 @@ void SamplingWorker::FillCompletedRunOverviews(WorkerPublication& publication) {
             case RunOutcome::kFailed:
                 break;
         }
-        publication.changed_overviews.push_back({run->run_id, run->target_id,
-                                                 status, run->start_time,
-                                                 run->finish_time, run->error});
+        publication.changed_overviews.push_back({run.run_id, run.target_id,
+                                                 status, run.start_time,
+                                                 run.finish_time, run.error});
     }
 }
 
@@ -59,9 +59,8 @@ void SamplingWorker::HandleCommand(WorkerCommand command) {
                 .start_time = std::nullopt,
                 .finish_time = std::chrono::system_clock::now(),
                 .sampling_results = {}};
-            WorkerPublication publication{
-                .completed_runs = {std::make_shared<const CompletedRun>(
-                    std::move(completed_run))}};
+            WorkerPublication publication;
+            publication.completed_runs.push_back(std::move(completed_run));
             FillCompletedRunOverviews(publication);
             Publish(std::move(publication));
             return;
@@ -92,9 +91,8 @@ void SamplingWorker::HandleCommand(WorkerCommand command) {
             // Record a natural finish rather than trying to terminate it.
             auto completed_run =
                 std::move(run).Complete(RunOutcome::kFinished, std::nullopt);
-            WorkerPublication publication{
-                .completed_runs = {std::make_shared<const CompletedRun>(
-                    std::move(completed_run))}};
+            WorkerPublication publication;
+            publication.completed_runs.push_back(std::move(completed_run));
             FillCompletedRunOverviews(publication);
             Publish(std::move(publication));
             active_runs_.erase(entry);
@@ -118,9 +116,8 @@ void SamplingWorker::HandleCommand(WorkerCommand command) {
     // run.
     auto completed_run =
         std::move(run).Complete(RunOutcome::kTerminated, std::nullopt);
-    WorkerPublication publication{
-        .completed_runs = {
-            std::make_shared<const CompletedRun>(std::move(completed_run))}};
+    WorkerPublication publication;
+    publication.completed_runs.push_back(std::move(completed_run));
     FillCompletedRunOverviews(publication);
     Publish(std::move(publication));
     active_runs_.erase(entry);
@@ -167,9 +164,8 @@ void SamplingWorker::RunLoop(std::stop_token stop) {
                 // naturally.
                 auto completed_run = std::move(run).Complete(
                     RunOutcome::kFinished, std::nullopt);
-                WorkerPublication publication{
-                    .completed_runs = {std::make_shared<const CompletedRun>(
-                        std::move(completed_run))}};
+                WorkerPublication publication;
+                publication.completed_runs.push_back(std::move(completed_run));
                 FillCompletedRunOverviews(publication);
                 Publish(std::move(publication));
                 // erase() returns the next iterator; do not increment it again.
@@ -198,9 +194,8 @@ void SamplingWorker::RunLoop(std::stop_token stop) {
             error = termination.error();
         }
         auto completed_run = std::move(run).Complete(outcome, error);
-        WorkerPublication publication{
-            .completed_runs = {std::make_shared<const CompletedRun>(
-                std::move(completed_run))}};
+        WorkerPublication publication;
+        publication.completed_runs.push_back(std::move(completed_run));
         FillCompletedRunOverviews(publication);
         Publish(std::move(publication));
     }
