@@ -10,7 +10,10 @@ add_executable(hemlok_exiting_process_fixture
 )
 
 add_executable(hemlok_tests ${HEMLOK_TEST_SOURCES})
-target_include_directories(hemlok_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(hemlok_tests PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${PROJECT_SOURCE_DIR}/src"
+)
 target_link_libraries(hemlok_tests PRIVATE
     hemlok_lib
     Catch2::Catch2WithMain
