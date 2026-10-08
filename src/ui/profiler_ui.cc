@@ -3,19 +3,13 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
-#include <algorithm>
 #include <boost/scope/scope_exit.hpp>
 #include <chrono>
 #include <cstdlib>
 #include <ctime>
-#include <filesystem>
-#include <optional>
-#include <profiler/target.hpp>
 #include <string>
-#include <system_error>
 #include <ui/profiler_ui.hpp>
-#include <utility>
-#include <vector>
+#include <ui/profiler_ui_logic.hpp>
 
 namespace hemlok::ui {
 
@@ -177,41 +171,13 @@ void ProfilerUi::Draw() {
 }
 
 bool ProfilerUi::AddTarget() {
-    std::filesystem::path executable_path(executable_path_.data());
-    if (executable_path.empty()) {
-        target_error_ = "Enter an executable path.";
+    const auto result = detail::SubmitTarget(profiler_, target_name_.data(),
+                                             executable_path_.data());
+    if (!result) {
+        target_error_ = result.error();
         return false;
     }
-
-    std::error_code error;
-    executable_path = std::filesystem::absolute(executable_path, error);
-    if (error || !std::filesystem::is_regular_file(executable_path, error)) {
-        target_error_ = "Path must refer to an existing regular file.";
-        return false;
-    }
-
-    std::optional<std::string> name;
-    if (target_name_[0] != '\0') {
-        name.emplace(target_name_.data());
-    }
-    auto target =
-        profiler::Target::Create(std::move(name), std::move(executable_path));
-    if (!target) {
-        switch (target.error()) {
-            case profiler::TargetError::kBlankName:
-                target_error_ = "Name must contain a non-whitespace character.";
-                break;
-            case profiler::TargetError::kEmptyPath:
-                target_error_ = "Enter an executable path.";
-                break;
-            case profiler::TargetError::kRelativePath:
-                target_error_ = "Executable path must be absolute.";
-                break;
-        }
-        return false;
-    }
-
-    selected_target_ = profiler_.AddTarget(std::move(*target));
+    selected_target_ = *result;
     return true;
 }
 
@@ -247,13 +213,8 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
     ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextBorderSize, 1.0F);
     ImGui::SeparatorText("Runs");
     ImGui::PopStyleVar();
-    std::vector<profiler::RunId> run_ids;
-    for (const auto& [id, entry] : profiler_.GetRunOverviews()) {
-        if (entry.target_id == target) {
-            run_ids.push_back(id);
-        }
-    }
-    std::sort(run_ids.rbegin(), run_ids.rend());
+    const auto run_ids =
+        detail::GetTargetRunIds(profiler_.GetRunOverviews(), target);
     if (run_ids.empty()) {
         ImGui::TextDisabled("No runs yet.");
         return;
@@ -348,19 +309,15 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
             ImGui::TextUnformatted("--");
         }
         ImGui::TableNextColumn();
-        const auto end =
-            run.finish_time.value_or(std::chrono::system_clock::now());
-        if (run.start_time) {
-            const double seconds =
-                std::chrono::duration<double>(end - *run.start_time).count();
-            ImGui::Text("%.2f s", std::max(0.0, seconds));
+        const auto duration = detail::GetRunDurationSeconds(
+            run, std::chrono::system_clock::now());
+        if (duration) {
+            ImGui::Text("%.2f s", *duration);
         } else {
             ImGui::TextUnformatted("--");
         }
         ImGui::TableNextColumn();
-        if ((run.status == profiler::RunStatus::kStarting ||
-             run.status == profiler::RunStatus::kRunning) &&
-            ImGui::Button("Terminate")) {
+        if (detail::CanTerminate(run.status) && ImGui::Button("Terminate")) {
             run_error_ = profiler_.TerminateRun(id)
                              ? nullptr
                              : "Could not terminate the process.";
