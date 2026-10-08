@@ -1,5 +1,5 @@
 #include <process/process.hpp>
-#include <string>
+#include <process/process_errors.hpp>
 #include <vector>
 
 namespace hemlok::process {
@@ -8,19 +8,7 @@ std::expected<Process, ProcessError> Process::CreateFromExecutable(
     boost::system::error_code error;
     Process process(path, error);
     if (error) {
-        if (error == boost::system::errc::no_such_file_or_directory ||
-            error == boost::system::errc::not_a_directory) {
-            return std::unexpected(ProcessError::kFileNotFound);
-        }
-        if (error == boost::system::errc::permission_denied ||
-            error == boost::system::errc::operation_not_permitted) {
-            return std::unexpected(ProcessError::kPermissionDenied);
-        }
-        if (error == boost::system::errc::executable_format_error ||
-            error == boost::system::errc::is_a_directory) {
-            return std::unexpected(ProcessError::kInvalidExecutable);
-        }
-        return std::unexpected(ProcessError::kStartFailed);
+        return std::unexpected(detail::MapLaunchError(error));
     }
     return process;
 }
@@ -36,11 +24,7 @@ std::expected<bool, ProcessError> Process::IsRunning() {
     boost::system::error_code error;
     const bool running = state_->process.running(error);
     if (error) {
-        if (error == boost::system::errc::permission_denied ||
-            error == boost::system::errc::operation_not_permitted) {
-            return std::unexpected(ProcessError::kPermissionDenied);
-        }
-        return std::unexpected(ProcessError::kStatusQueryFailed);
+        return std::unexpected(detail::MapStatusError(error));
     }
     return running;
 }
@@ -49,11 +33,7 @@ std::expected<void, ProcessError> Process::Terminate() {
     boost::system::error_code error;
     state_->process.terminate(error);
     if (error) {
-        if (error == boost::system::errc::permission_denied ||
-            error == boost::system::errc::operation_not_permitted) {
-            return std::unexpected(ProcessError::kPermissionDenied);
-        }
-        return std::unexpected(ProcessError::kTerminationFailed);
+        return std::unexpected(detail::MapTerminationError(error));
     }
     return {};
 }
