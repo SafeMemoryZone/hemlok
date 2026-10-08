@@ -123,4 +123,28 @@ TEST_CASE("worker handles launch failure and duplicate termination in order",
     observed.CheckCompletion(2, 20, RunOutcome::kTerminated);
     observed.CheckCompletion(3, 30, RunOutcome::kFinished);
 }
+
+TEST_CASE("worker survives repeated failed launches", "[profiler][worker]") {
+    hemlok::testing::TemporaryDirectory directory;
+    CommandChannel commands;
+    PublicationChannel publications;
+    Publications observed;
+    constexpr RunId kRunCount = 64;
+    for (RunId id = 0; id < kRunCount; ++id) {
+        commands.Send(StartRunCommand{id, 10, directory.GetPath() / "missing"});
+    }
+    SamplingWorker worker(commands, publications);
+    observed.WaitFor(publications, [&] {
+        for (RunId id = 0; id < kRunCount; ++id) {
+            if (!observed.HasStatus(id, RunStatus::kFailed)) return false;
+        }
+        return true;
+    });
+    worker.Shutdown();
+    observed.Drain(publications);
+    for (RunId id = 0; id < kRunCount; ++id) {
+        observed.CheckCompletion(id, 10, RunOutcome::kFailed,
+                                 hemlok::process::ProcessError::kFileNotFound);
+    }
+}
 }  // namespace
