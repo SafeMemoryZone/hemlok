@@ -1,7 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <process/process.hpp>
+#include <support/temporary_directory.hpp>
 #include <thread>
 #include <utility>
 
@@ -12,6 +14,57 @@
 namespace {
 using hemlok::process::Process;
 using hemlok::process::ProcessError;
+
+TEST_CASE("a fixture launches from a path containing spaces", "[process]") {
+    hemlok::testing::TemporaryDirectory directory;
+    const auto path = directory.GetPath() / "worker with spaces";
+    std::filesystem::copy_file(HEMLOK_PROCESS_FIXTURE_PATH, path);
+    auto process = Process::CreateFromExecutable(path);
+    REQUIRE(process);
+    const auto running = process->IsRunning();
+    REQUIRE(running);
+    REQUIRE(*running);
+    REQUIRE(process->Terminate());
+    const auto stopped = process->IsRunning();
+    REQUIRE(stopped);
+    REQUIRE_FALSE(*stopped);
+}
+
+#if defined(__unix__) || defined(__APPLE__)
+TEST_CASE("launch rejects a file without execute permission", "[process]") {
+    hemlok::testing::TemporaryDirectory directory;
+    const auto path = directory.GetPath() / "not executable";
+    std::filesystem::copy_file(HEMLOK_PROCESS_FIXTURE_PATH, path);
+    std::filesystem::permissions(path, std::filesystem::perms::owner_read |
+                                           std::filesystem::perms::owner_write);
+    const auto result = Process::CreateFromExecutable(path);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error() == ProcessError::kPermissionDenied);
+}
+
+TEST_CASE("launch rejects invalid executable bytes", "[process]") {
+    hemlok::testing::TemporaryDirectory directory;
+    const auto path = directory.GetPath() / "invalid";
+    {
+        std::ofstream file(path, std::ios::binary);
+        file.write("\0invalid\0", 9);
+        REQUIRE(file.good());
+    }
+    std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+    const auto result = Process::CreateFromExecutable(path);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error() == ProcessError::kInvalidExecutable);
+}
+
+TEST_CASE("launch rejects a directory", "[process]") {
+    hemlok::testing::TemporaryDirectory directory;
+    const auto result = Process::CreateFromExecutable(directory.GetPath());
+    REQUIRE_FALSE(result);
+    // POSIX launchers may report EACCES or EISDIR for a directory.
+    REQUIRE((result.error() == ProcessError::kPermissionDenied ||
+             result.error() == ProcessError::kInvalidExecutable));
+}
+#endif
 
 TEST_CASE("starting a missing executable returns a file-not-found error",
           "[process]") {
