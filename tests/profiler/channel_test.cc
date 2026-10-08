@@ -68,12 +68,16 @@ TEST_CASE("sending wakes an idle or timed channel wait",
     REQUIRE(channel.TakeAll() == std::vector<int>{7});
 }
 
-TEST_CASE("shutdown interrupts an idle channel wait", "[profiler][channel]") {
+TEST_CASE("shutdown interrupts idle and timed channel waits",
+          "[profiler][channel]") {
     hemlok::profiler::Channel<int> channel;
+    std::optional<std::chrono::milliseconds> timeout;
+    SECTION("idle wait") {}
+    SECTION("timed wait") { timeout = std::chrono::seconds{30}; }
     std::promise<void> finished;
     auto result = finished.get_future();
     std::jthread waiter([&](std::stop_token stop) {
-        channel.Wait(stop);
+        channel.Wait(stop, timeout);
         finished.set_value();
     });
     REQUIRE(result.wait_for(std::chrono::milliseconds{20}) ==
@@ -81,6 +85,25 @@ TEST_CASE("shutdown interrupts an idle channel wait", "[profiler][channel]") {
     waiter.request_stop();
     REQUIRE(result.wait_for(std::chrono::seconds{5}) ==
             std::future_status::ready);
+    REQUIRE(channel.TakeAll().empty());
+}
+
+TEST_CASE("an already stopped channel wait preserves queued messages",
+          "[profiler][channel]") {
+    hemlok::profiler::Channel<int> channel;
+    std::stop_source stop;
+    stop.request_stop();
+    std::vector<int> expected;
+    SECTION("empty queue") {}
+    SECTION("queued messages") {
+        channel.Send(1);
+        channel.Send(2);
+        expected = {1, 2};
+    }
+    // CTest also bounds the whole case if a broken wait ignores this token.
+    channel.Wait(stop.get_token());
+    channel.Wait(stop.get_token(), std::chrono::seconds{30});
+    REQUIRE(channel.TakeAll() == expected);
     REQUIRE(channel.TakeAll().empty());
 }
 

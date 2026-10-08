@@ -42,4 +42,21 @@ TEST_CASE("active runs expose metadata and move results into completion",
     REQUIRE(completed.finish_time >= *completed.start_time);
     REQUIRE(completed.outcome == RunOutcome::kTerminated);
 }
+
+TEST_CASE("failed completion retains the supplied error and run metadata",
+          "[profiler]") {
+    auto process = hemlok::process::Process::CreateFromExecutable(
+        HEMLOK_PROCESS_FIXTURE_PATH);
+    REQUIRE(process);
+    auto run = ActiveRun::Create(42, 7, std::move(*process));
+    const auto initial = run.GetOverview();
+    REQUIRE(run.TerminateProcess());
+    const auto error = hemlok::process::ProcessError::kTerminationFailed;
+    const auto completed = std::move(run).Complete(RunOutcome::kFailed, error);
+    REQUIRE(completed.run_id == initial.run_id);
+    REQUIRE(completed.target_id == initial.target_id);
+    REQUIRE(completed.start_time == initial.start_time);
+    REQUIRE(completed.outcome == RunOutcome::kFailed);
+    REQUIRE(completed.error == error);
+}
 }  // namespace

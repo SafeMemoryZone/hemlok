@@ -23,6 +23,15 @@ TEST_CASE("a new profiler has no targets", "[profiler]") {
     REQUIRE(profiler.GetTargets().empty());
 }
 
+TEST_CASE("polling an empty profiler is repeatable", "[profiler]") {
+    Profiler profiler;
+    profiler.Poll();
+    profiler.Poll();
+    REQUIRE(profiler.GetTargets().empty());
+    REQUIRE(profiler.GetRunOverviews().empty());
+    REQUIRE(profiler.GetCompletedRuns().empty());
+}
+
 TEST_CASE("a profiler stores a named target", "[profiler]") {
     Profiler profiler;
     const std::filesystem::path executable_path = "/usr/bin/example";
@@ -251,5 +260,44 @@ TEST_CASE("generated IDs continue across profiler instances", "[profiler]") {
     REQUIRE(*run == first_run + 1);
     WaitFor(profiler,
             [&] { return IsCompleted(profiler.GetRunOverviews().at(*run)); });
+}
+
+TEST_CASE("polling retains independent histories for different targets",
+          "[profiler]") {
+    Profiler profiler;
+    const auto long_target =
+        profiler.AddTarget(MakeTarget("waiting", HEMLOK_PROCESS_FIXTURE_PATH));
+    const auto short_target = profiler.AddTarget(
+        MakeTarget("exiting", HEMLOK_EXITING_PROCESS_FIXTURE_PATH));
+    const auto long_run = profiler.StartRun(long_target);
+    const auto short_run = profiler.StartRun(short_target);
+    REQUIRE(long_run);
+    REQUIRE(short_run);
+    WaitFor(profiler, [&] {
+        return profiler.GetRunOverviews().at(*long_run).status ==
+                   RunStatus::kRunning &&
+               IsCompleted(profiler.GetRunOverviews().at(*short_run));
+    });
+    const auto finished = profiler.GetCompletedRun(*short_run);
+    REQUIRE(finished.target_id == short_target);
+    REQUIRE(finished.outcome == RunOutcome::kFinished);
+    REQUIRE(profiler.GetRunOverviews().at(*long_run).target_id == long_target);
+    REQUIRE_FALSE(profiler.GetCompletedRuns().contains(*long_run));
+    REQUIRE(profiler.TerminateRun(*long_run));
+    WaitFor(profiler,
+            [&] { return profiler.GetCompletedRuns().contains(*long_run); });
+    REQUIRE(profiler.GetCompletedRun(*long_run).target_id == long_target);
+    REQUIRE(profiler.GetCompletedRun(*long_run).outcome ==
+            RunOutcome::kTerminated);
+    profiler.Poll();
+    profiler.Poll();
+    REQUIRE(profiler.GetCompletedRuns().size() == 2);
+    const auto& retained = profiler.GetCompletedRun(*short_run);
+    REQUIRE(retained.run_id == finished.run_id);
+    REQUIRE(retained.target_id == finished.target_id);
+    REQUIRE(retained.outcome == finished.outcome);
+    REQUIRE(retained.error == finished.error);
+    REQUIRE(retained.start_time == finished.start_time);
+    REQUIRE(retained.finish_time == finished.finish_time);
 }
 }  // namespace
