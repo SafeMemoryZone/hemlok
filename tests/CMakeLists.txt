@@ -10,11 +10,16 @@ add_executable(hemlok_exiting_process_fixture
 )
 
 add_executable(hemlok_tests ${HEMLOK_TEST_SOURCES})
+target_include_directories(hemlok_tests PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${PROJECT_SOURCE_DIR}/src"
+)
 target_link_libraries(hemlok_tests PRIVATE
     hemlok_lib
     Catch2::Catch2WithMain
 )
 target_compile_definitions(hemlok_tests PRIVATE
+    HEMLOK_TEST_TEMP_DIR="${CMAKE_CURRENT_BINARY_DIR}/tmp"
     HEMLOK_PROCESS_FIXTURE_PATH="$<TARGET_FILE:hemlok_process_fixture>"
     HEMLOK_EXITING_PROCESS_FIXTURE_PATH="$<TARGET_FILE:hemlok_exiting_process_fixture>"
 )
@@ -22,4 +27,4 @@ add_dependencies(hemlok_tests hemlok_process_fixture hemlok_exiting_process_fixt
 
 list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
 include(Catch)
-catch_discover_tests(hemlok_tests)
+catch_discover_tests(hemlok_tests PROPERTIES TIMEOUT 15)

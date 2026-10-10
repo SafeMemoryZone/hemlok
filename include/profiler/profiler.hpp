@@ -1,46 +1,41 @@
 #ifndef HEMLOK_PROFILER_PROFILER_HPP_
 #define HEMLOK_PROFILER_PROFILER_HPP_
 
-#include <cstdint>
 #include <expected>
-#include <profiler/profiling_run.hpp>
-#include <profiler/profiling_target.hpp>
+#include <process/process.hpp>
+#include <profiler/sampling_worker.hpp>
+#include <profiler/target.hpp>
 #include <unordered_map>
 
 namespace hemlok::profiler {
-using TargetId = std::uint64_t;
-using RunId = std::uint64_t;
-
-enum class ProfilerError {
-    kProcessStartFailed,
-    kProcessTerminated,
-    kStatusQueryFailed,
-    kTerminationFailed,
-};
-
-struct RunEntry {
-    TargetId id;
-    ProfilingRun profiling_run;
-};
-
+// Main-thread facade. Process operations and their errors arrive via Poll().
 class Profiler {
 public:
-    Profiler() = default;
-
-    TargetId AddProfilingTarget(ProfilingTarget target);
-    std::expected<RunId, ProfilerError> Profile(TargetId target);
-    std::expected<void, ProfilerError> Terminate(RunId run);
-    // Each run retains its own polling error.
+    Profiler();
+    TargetId AddTarget(Target target);
+    // Success means the command was queued, not that the process has launched.
+    std::expected<RunId, process::ProcessError> StartRun(TargetId target);
+    // Termination failures are reported in the run overview after Poll().
+    std::expected<void, process::ProcessError> TerminateRun(RunId run);
+    // Drains the publication queue; never queries or controls processes.
     void Poll();
-    const std::unordered_map<TargetId, ProfilingTarget>& GetTargets() const;
-    const std::unordered_map<RunId, RunEntry>& GetRuns() const;
+    const std::unordered_map<TargetId, Target>& GetTargets() const;
+    const std::unordered_map<RunId, RunOverview>& GetRunOverviews() const;
+    const std::unordered_map<RunId, CompletedRun>& GetCompletedRuns() const;
+    // The run must be completed; requesting an ongoing or unknown run is a
+    // caller bug.
+    const CompletedRun& GetCompletedRun(RunId run) const;
 
 private:
-    TargetId next_target_id_ = 0;
-    RunId next_run_id_ = 0;
-
-    std::unordered_map<TargetId, ProfilingTarget> targets_;
-    std::unordered_map<RunId, RunEntry> profiling_runs_;
+    static TargetId GenerateTargetId();
+    static RunId GenerateRunId();
+    void ApplyPublication(WorkerPublication publication);
+    std::unordered_map<TargetId, Target> targets_;
+    std::unordered_map<RunId, CompletedRun> completed_runs_;
+    std::unordered_map<RunId, RunOverview> run_overviews_;
+    CommandChannel commands_;
+    PublicationChannel publications_;
+    SamplingWorker worker_;
 };
 }  // namespace hemlok::profiler
 

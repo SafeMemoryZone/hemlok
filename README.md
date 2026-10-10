@@ -1,6 +1,6 @@
 # Hemlok
 
-Simple C++20 sampling profiler with Dear ImGui.
+Simple C++23 sampling profiler with Dear ImGui.
 
 ## Building
 

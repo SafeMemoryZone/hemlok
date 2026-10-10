@@ -1,5 +1,5 @@
-#ifndef HEMLOK_PROFILER_PROFILING_TARGET_HPP_
-#define HEMLOK_PROFILER_PROFILING_TARGET_HPP_
+#ifndef HEMLOK_PROFILER_TARGET_HPP_
+#define HEMLOK_PROFILER_TARGET_HPP_
 
 #include <expected>
 #include <filesystem>
@@ -17,9 +17,9 @@ enum class TargetError {
 // Owns a nonblank optional name and a nonempty absolute path. Filesystem
 // existence and executability must still be checked when launching.
 // Moved-from targets must be reassigned before reuse.
-class ProfilingTarget {
+class Target {
 public:
-    static std::expected<ProfilingTarget, TargetError> Create(
+    static std::expected<Target, TargetError> Create(
         std::optional<std::string> name,
         std::filesystem::path executable_path) {
         if (name &&
@@ -32,7 +32,7 @@ public:
         if (!executable_path.is_absolute()) {
             return std::unexpected(TargetError::kRelativePath);
         }
-        return ProfilingTarget(std::move(name), std::move(executable_path));
+        return Target(std::move(name), std::move(executable_path));
     }
 
     const std::optional<std::string>& GetName() const { return name_; }
@@ -41,8 +41,8 @@ public:
     }
 
 private:
-    ProfilingTarget(std::optional<std::string> name,
-                    std::filesystem::path executable_path)
+    Target(std::optional<std::string> name,
+           std::filesystem::path executable_path)
         : name_(std::move(name)),
           executable_path_(std::move(executable_path)) {}
 
@@ -51,4 +51,4 @@ private:
 };
 }  // namespace hemlok::profiler
 
-#endif  // HEMLOK_PROFILER_PROFILING_TARGET_HPP_
+#endif  // HEMLOK_PROFILER_TARGET_HPP_
