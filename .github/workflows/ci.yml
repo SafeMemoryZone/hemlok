@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14 cmake ninja-build libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build -G Ninja
+          -DCMAKE_CXX_COMPILER=g++-14
+          -DCMAKE_BUILD_TYPE=Debug
+          -DHEMLOK_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel 2
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure --no-tests=error
+
+  formatting:
+    name: Check formatting
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      # Use Homebrew's recent clang-format to support the repository configuration.
+      - name: Install clang-format
+        run: |
+          brew install clang-format
+          echo "$(brew --prefix clang-format)/bin" >> "$GITHUB_PATH"
+
+      - name: Check tracked C/C++ sources and headers
+        shell: bash
+        run: |
+          clang-format --version
+          git ls-files -z \
+            '*.c' '*.cc' '*.cpp' '*.cxx' \
+            '*.h' '*.hh' '*.hpp' '*.hxx' |
+            xargs -0 clang-format --dry-run --Werror --style=file
