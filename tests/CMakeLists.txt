@@ -9,6 +9,14 @@ add_executable(hemlok_exiting_process_fixture
     process/fixtures/exiting_process.cc
 )
 
+add_executable(hemlok_busy_process_fixture
+    sampling/fixtures/busy_process.cc
+)
+add_executable(hemlok_threaded_process_fixture
+    sampling/fixtures/threaded_process.cc
+)
+target_link_libraries(hemlok_threaded_process_fixture PRIVATE Threads::Threads)
+
 add_executable(hemlok_tests ${HEMLOK_TEST_SOURCES})
 target_include_directories(hemlok_tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -22,8 +30,15 @@ target_compile_definitions(hemlok_tests PRIVATE
     HEMLOK_TEST_TEMP_DIR="${CMAKE_CURRENT_BINARY_DIR}/tmp"
     HEMLOK_PROCESS_FIXTURE_PATH="$<TARGET_FILE:hemlok_process_fixture>"
     HEMLOK_EXITING_PROCESS_FIXTURE_PATH="$<TARGET_FILE:hemlok_exiting_process_fixture>"
+    HEMLOK_BUSY_PROCESS_FIXTURE_PATH="$<TARGET_FILE:hemlok_busy_process_fixture>"
+    HEMLOK_THREADED_PROCESS_FIXTURE_PATH="$<TARGET_FILE:hemlok_threaded_process_fixture>"
 )
-add_dependencies(hemlok_tests hemlok_process_fixture hemlok_exiting_process_fixture)
+add_dependencies(hemlok_tests
+    hemlok_process_fixture
+    hemlok_exiting_process_fixture
+    hemlok_busy_process_fixture
+    hemlok_threaded_process_fixture
+)
 
 list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
 include(Catch)
