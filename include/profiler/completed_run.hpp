@@ -4,17 +4,18 @@
 #include <optional>
 #include <process/process.hpp>
 #include <profiler/run_types.hpp>
-#include <profiler/sampling_results.hpp>
+#include <profiler/sampling_data.hpp>
 
 namespace hemlok::profiler {
+// Published once by the worker; consumers read it through const references.
 struct CompletedRun {
     RunId run_id;
     TargetId target_id;
     RunOutcome outcome;
-    std::optional<process::ProcessError> error;
+    std::optional<RunError> error;
     std::optional<TimePoint> start_time;
     TimePoint finish_time;
-    SamplingResults sampling_results;
+    SamplingData sampling_data;
 };
 }  // namespace hemlok::profiler
 

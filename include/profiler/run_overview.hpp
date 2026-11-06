@@ -12,7 +12,7 @@ struct RunOverview {
     RunStatus status;
     std::optional<TimePoint> start_time;
     std::optional<TimePoint> finish_time;
-    std::optional<process::ProcessError> error;
+    std::optional<RunError> error;
 };
 }  // namespace hemlok::profiler
 

@@ -33,6 +33,10 @@ jobs:
       - name: Build
         run: cmake --build build --parallel 2
 
+      # Sampling tests need unprivileged access to perf events.
+      - name: Allow perf event sampling
+        run: sudo sysctl -w kernel.perf_event_paranoid=2
+
       - name: Run tests
         run: ctest --test-dir build --output-on-failure --no-tests=error
 

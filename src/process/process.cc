@@ -33,6 +33,8 @@ Process::Process(std::filesystem::path path, boost::system::error_code& error)
         std::vector<std::string>{});
 }
 
+int Process::GetPid() const { return state_->process.id(); }
+
 std::expected<bool, ProcessError> Process::IsRunning() {
     boost::system::error_code error;
     const bool running = state_->process.running(error);

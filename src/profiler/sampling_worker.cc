@@ -1,6 +1,7 @@
 #include <process/process.hpp>
 #include <profiler/sampling_worker.hpp>
 #include <profiler/worker_operations.hpp>
+#include <sampling/sampling_session.hpp>
 #include <utility>
 
 namespace hemlok::profiler {
@@ -40,7 +41,7 @@ void SamplingWorker::HandleCommand(WorkerCommand command) {
                 .error = process.error(),
                 .start_time = std::nullopt,
                 .finish_time = std::chrono::system_clock::now(),
-                .sampling_results = {}};
+                .sampling_data = {}};
             WorkerPublication publication;
             publication.completed_runs.push_back(std::move(completed_run));
             detail::FillCompletedRunOverviews(publication);
@@ -48,10 +49,25 @@ void SamplingWorker::HandleCommand(WorkerCommand command) {
             return;
         }
 
-        // Launch succeeded. Publish the running overview and keep the process
+        // Launch succeeded. Every active run is sampled, so attach before
+        // tracking the process.
+        const auto start_time = std::chrono::system_clock::now();
+        auto session = sampling::SamplingSession::Attach(process->GetPid());
+        if (!session.has_value()) {
+            WorkerPublication publication;
+            publication.completed_runs.push_back(detail::CompleteUnsampledRun(
+                start->run_id, start->target_id, start_time, process.value(),
+                session.error()));
+            detail::FillCompletedRunOverviews(publication);
+            Publish(std::move(publication));
+            return;
+        }
+
+        // Publish the running overview and keep the process and its session
         // here.
         auto run = ActiveRun::Create(start->run_id, start->target_id,
-                                     std::move(process.value()));
+                                     std::move(process.value()),
+                                     std::move(session.value()));
         Publish({{run.GetOverview()}, {}});
         active_runs_.emplace(start->run_id, std::move(run));
         return;
@@ -78,10 +94,13 @@ void SamplingWorker::RunLoop(std::stop_token stop) {
             break;
         }
 
-        // Handle queued commands in order before checking the remaining
-        // processes.
+        // Handle queued commands in order, collect samples, then check the
+        // remaining processes.
         for (auto& command : commands_.TakeAll()) {
             HandleCommand(std::move(command));
+        }
+        for (auto& [id, run] : active_runs_) {
+            run.CollectSamples();
         }
         detail::PollActiveRuns(active_runs_, publications_);
     }

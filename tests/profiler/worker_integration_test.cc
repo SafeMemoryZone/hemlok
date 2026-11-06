@@ -35,8 +35,7 @@ public:
         return false;
     }
     void CheckCompletion(RunId id, TargetId target, RunOutcome outcome,
-                         std::optional<hemlok::process::ProcessError> error =
-                             std::nullopt) const {
+                         std::optional<RunError> error = std::nullopt) const {
         int count = 0;
         for (const auto& publication : messages_) {
             for (const auto& run : publication.completed_runs) {

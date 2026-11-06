@@ -30,6 +30,13 @@ TEST_CASE("a fixture launches from a path containing spaces", "[process]") {
     REQUIRE_FALSE(*stopped);
 }
 
+TEST_CASE("a launched process exposes its process ID", "[process]") {
+    auto process = Process::CreateFromExecutable(HEMLOK_PROCESS_FIXTURE_PATH);
+    REQUIRE(process);
+    REQUIRE(process->GetPid() > 0);
+    REQUIRE(process->Terminate());
+}
+
 #if defined(__unix__) || defined(__APPLE__)
 TEST_CASE("launch rejects a file without execute permission", "[process]") {
     hemlok::testing::TemporaryDirectory directory;

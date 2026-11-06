@@ -7,9 +7,11 @@
 #include <chrono>
 #include <cstdlib>
 #include <ctime>
+#include <format>
 #include <string>
 #include <ui/profiler_ui.hpp>
 #include <ui/profiler_ui_logic.hpp>
+#include <variant>
 
 namespace hemlok::ui {
 
@@ -149,6 +151,7 @@ void ProfilerUi::Draw() {
         ImGui::PushID(static_cast<int>(target_id));
         if (ImGui::Selectable(label.c_str(), is_selected)) {
             selected_target_ = target_id;
+            selected_run_ = std::nullopt;
             run_error_ = nullptr;
         }
         ImGui::PopID();
@@ -161,7 +164,17 @@ void ProfilerUi::Draw() {
         if (target != targets.end()) {
             ImGui::SameLine();
             if (ImGui::BeginChild("Target details")) {
-                DrawTargetDetails(target->first, target->second);
+                // A selected completed run replaces the target page.
+                const auto& completed_runs = profiler_.GetCompletedRuns();
+                const auto run = selected_run_.has_value()
+                                     ? completed_runs.find(*selected_run_)
+                                     : completed_runs.end();
+                if (run != completed_runs.end() &&
+                    run->second.target_id == target->first) {
+                    DrawRunDetails(run->second);
+                } else {
+                    DrawTargetDetails(target->first, target->second);
+                }
             }
             ImGui::EndChild();
         }
@@ -272,8 +285,12 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
         if (run.error) {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1.0F, 0.7F, 0.2F, 1.0F), "Error");
-            if (ImGui::IsItemHovered()) {
-                switch (*run.error) {
+            const auto* process_error =
+                std::get_if<process::ProcessError>(&*run.error);
+            const auto* sampling_error =
+                std::get_if<sampling::SamplingError>(&*run.error);
+            if (ImGui::IsItemHovered() && process_error != nullptr) {
+                switch (*process_error) {
                     case process::ProcessError::kFileNotFound:
                         ImGui::SetTooltip("Executable not found.");
                         break;
@@ -292,6 +309,26 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
                     case process::ProcessError::kStatusQueryFailed:
                         ImGui::SetTooltip(
                             "Could not check process status. Retrying.");
+                        break;
+                }
+            }
+            if (ImGui::IsItemHovered() && sampling_error != nullptr) {
+                switch (*sampling_error) {
+                    case sampling::SamplingError::kProcessNotFound:
+                        ImGui::SetTooltip(
+                            "Could not find the process to sample.");
+                        break;
+                    case sampling::SamplingError::kPermissionDenied:
+                        ImGui::SetTooltip(
+                            "Sampling permission denied. Check "
+                            "kernel.perf_event_paranoid.");
+                        break;
+                    case sampling::SamplingError::kMultiThreaded:
+                        ImGui::SetTooltip(
+                            "Multi-threaded processes are not supported.");
+                        break;
+                    case sampling::SamplingError::kAttachFailed:
+                        ImGui::SetTooltip("Could not start sampling.");
                         break;
                 }
             }
@@ -322,9 +359,42 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
                              ? nullptr
                              : "Could not terminate the process.";
         }
+        // Sampling data exists only once the run has completed.
+        if (profiler_.GetCompletedRuns().contains(id) &&
+            ImGui::Button("Details")) {
+            selected_run_ = id;
+        }
         ImGui::PopID();
     }
     ImGui::EndTable();
+}
+
+void ProfilerUi::DrawRunDetails(const profiler::CompletedRun& run) {
+    if (ImGui::ArrowButton("Back", ImGuiDir_Left)) {
+        selected_run_ = std::nullopt;
+    }
+    ImGui::SameLine();
+    ImGui::TextUnformatted("Back to runs");
+    ImGui::Spacing();
+
+    ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextBorderSize, 1.0F);
+    ImGui::SeparatorText("Time per function");
+    ImGui::PopStyleVar();
+    const auto& samples = run.sampling_data.samples;
+    if (samples.empty()) {
+        ImGui::TextDisabled("No samples were collected.");
+        return;
+    }
+    ImGui::Text("%zu samples", samples.size());
+    // One bar per function: the bar shows its share, the label names it.
+    for (const auto& share : detail::ComputeFunctionShares(samples)) {
+        const std::string percent =
+            std::format("{:.1f}%", share.fraction * 100.0);
+        ImGui::ProgressBar(static_cast<float>(share.fraction),
+                           ImVec2(240.0F, 0.0F), percent.c_str());
+        ImGui::SameLine();
+        ImGui::TextUnformatted(share.function_name.c_str());
+    }
 }
 
 void ProfilerUi::Shutdown() {

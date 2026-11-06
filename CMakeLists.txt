@@ -78,6 +78,18 @@ list(REMOVE_ITEM HEMLOK_LIBRARY_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/app.cc"
 )
 
+# Sampling is implemented per platform; compile only the current platform's
+# sources.
+list(FILTER HEMLOK_LIBRARY_SOURCES EXCLUDE REGEX "/src/sampling/linux/")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    file(GLOB HEMLOK_SAMPLING_SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/sampling/linux/*.cc"
+    )
+else()
+    message(FATAL_ERROR "Sampling is only implemented for Linux.")
+endif()
+list(APPEND HEMLOK_LIBRARY_SOURCES ${HEMLOK_SAMPLING_SOURCES})
+
 add_library(hemlok_lib STATIC ${HEMLOK_LIBRARY_SOURCES})
 target_include_directories(hemlok_lib PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"

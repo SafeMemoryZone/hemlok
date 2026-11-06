@@ -29,6 +29,7 @@ public:
     static std::expected<Process, ProcessError> CreateFromExecutable(
         std::filesystem::path path);
 
+    int GetPid() const;
     std::expected<bool, ProcessError> IsRunning();
     std::expected<void, ProcessError> Terminate();
 
