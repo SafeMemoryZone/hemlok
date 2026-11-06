@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <ctime>
+#include <format>
 #include <string>
 #include <ui/profiler_ui.hpp>
 #include <ui/profiler_ui_logic.hpp>
@@ -150,6 +151,7 @@ void ProfilerUi::Draw() {
         ImGui::PushID(static_cast<int>(target_id));
         if (ImGui::Selectable(label.c_str(), is_selected)) {
             selected_target_ = target_id;
+            selected_run_ = std::nullopt;
             run_error_ = nullptr;
         }
         ImGui::PopID();
@@ -347,9 +349,43 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
                              ? nullptr
                              : "Could not terminate the process.";
         }
+        // Sampling data exists only once the run has completed.
+        if (profiler_.GetCompletedRuns().contains(id) &&
+            ImGui::Button("Details")) {
+            selected_run_ = id;
+        }
         ImGui::PopID();
     }
     ImGui::EndTable();
+
+    if (!selected_run_.has_value()) return;
+    const auto& completed_runs = profiler_.GetCompletedRuns();
+    const auto selected = completed_runs.find(*selected_run_);
+    if (selected != completed_runs.end() &&
+        selected->second.target_id == target) {
+        DrawRunDetails(selected->second);
+    }
+}
+
+void ProfilerUi::DrawRunDetails(const profiler::CompletedRun& run) {
+    ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextBorderSize, 1.0F);
+    ImGui::SeparatorText("Time per function");
+    ImGui::PopStyleVar();
+    const auto& samples = run.sampling_data.samples;
+    if (samples.empty()) {
+        ImGui::TextDisabled("No samples were collected.");
+        return;
+    }
+    ImGui::Text("%zu samples", samples.size());
+    // One bar per function: the bar shows its share, the label names it.
+    for (const auto& share : detail::ComputeFunctionShares(samples)) {
+        const std::string percent =
+            std::format("{:.1f}%", share.fraction * 100.0);
+        ImGui::ProgressBar(static_cast<float>(share.fraction),
+                           ImVec2(240.0F, 0.0F), percent.c_str());
+        ImGui::SameLine();
+        ImGui::TextUnformatted(share.function_name.c_str());
+    }
 }
 
 void ProfilerUi::Shutdown() {

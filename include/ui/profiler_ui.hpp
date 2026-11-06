@@ -30,6 +30,7 @@ private:
     void DrawTargetDetails(profiler::TargetId id,
                            const profiler::Target& target);
     void DrawRuns(profiler::TargetId target);
+    void DrawRunDetails(const profiler::CompletedRun& run);
     void Shutdown();
 
     // UI state
@@ -38,6 +39,7 @@ private:
     const char* target_error_ = nullptr;
     const char* run_error_ = nullptr;
     std::optional<profiler::TargetId> selected_target_;
+    std::optional<profiler::RunId> selected_run_;
 
     // App state
     profiler::Profiler& profiler_;

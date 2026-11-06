@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <chrono>
+#include <map>
 #include <system_error>
 #include <ui/profiler_ui_logic.hpp>
 #include <utility>
@@ -64,5 +65,25 @@ std::optional<double> GetRunDurationSeconds(const profiler::RunOverview& run,
     const double seconds =
         std::chrono::duration<double>(end - *run.start_time).count();
     return std::max(0.0, seconds);
+}
+
+std::vector<FunctionShare> ComputeFunctionShares(
+    const std::vector<sampling::Sample>& samples) {
+    std::map<std::string, std::size_t> counts;
+    for (const auto& sample : samples) {
+        ++counts[sample.function_name.value_or("[unknown]")];
+    }
+    std::vector<FunctionShare> shares;
+    for (const auto& [name, count] : counts) {
+        shares.push_back(
+            {name, count,
+             static_cast<double>(count) / static_cast<double>(samples.size())});
+    }
+    // counts is ordered by name, so a stable sort keeps ties in name order.
+    std::stable_sort(shares.begin(), shares.end(),
+                     [](const FunctionShare& left, const FunctionShare& right) {
+                         return left.sample_count > right.sample_count;
+                     });
+    return shares;
 }
 }  // namespace hemlok::ui::detail

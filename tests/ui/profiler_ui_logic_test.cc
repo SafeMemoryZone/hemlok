@@ -146,4 +146,26 @@ TEST_CASE(
     run.finish_time = start - 1s;
     REQUIRE(GetRunDurationSeconds(run, start + 10s) == 0.0);
 }
+TEST_CASE("function shares are empty without samples", "[ui]") {
+    REQUIRE(ComputeFunctionShares({}).empty());
+}
+
+TEST_CASE("function shares group samples and order by count then name",
+          "[ui]") {
+    const std::vector<hemlok::sampling::Sample> samples{
+        {0x10, "Compute()"},  {0x20, "Compute()"}, {0x30, std::nullopt},
+        {0x40, "Write()"},    {0x50, "Compute()"}, {0x60, std::nullopt},
+        {0x70, "Allocate()"},
+    };
+    const auto shares = ComputeFunctionShares(samples);
+    REQUIRE(shares.size() == 4);
+    REQUIRE(shares[0].function_name == "Compute()");
+    REQUIRE(shares[0].sample_count == 3);
+    REQUIRE(shares[0].fraction == 3.0 / 7.0);
+    REQUIRE(shares[1].function_name == "[unknown]");
+    REQUIRE(shares[1].sample_count == 2);
+    REQUIRE(shares[2].function_name == "Allocate()");
+    REQUIRE(shares[3].function_name == "Write()");
+    REQUIRE(shares[3].fraction == 1.0 / 7.0);
+}
 }  // namespace
