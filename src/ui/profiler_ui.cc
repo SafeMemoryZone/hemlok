@@ -164,7 +164,17 @@ void ProfilerUi::Draw() {
         if (target != targets.end()) {
             ImGui::SameLine();
             if (ImGui::BeginChild("Target details")) {
-                DrawTargetDetails(target->first, target->second);
+                // A selected completed run replaces the target page.
+                const auto& completed_runs = profiler_.GetCompletedRuns();
+                const auto run = selected_run_.has_value()
+                                     ? completed_runs.find(*selected_run_)
+                                     : completed_runs.end();
+                if (run != completed_runs.end() &&
+                    run->second.target_id == target->first) {
+                    DrawRunDetails(run->second);
+                } else {
+                    DrawTargetDetails(target->first, target->second);
+                }
             }
             ImGui::EndChild();
         }
@@ -357,17 +367,16 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
         ImGui::PopID();
     }
     ImGui::EndTable();
-
-    if (!selected_run_.has_value()) return;
-    const auto& completed_runs = profiler_.GetCompletedRuns();
-    const auto selected = completed_runs.find(*selected_run_);
-    if (selected != completed_runs.end() &&
-        selected->second.target_id == target) {
-        DrawRunDetails(selected->second);
-    }
 }
 
 void ProfilerUi::DrawRunDetails(const profiler::CompletedRun& run) {
+    if (ImGui::ArrowButton("Back", ImGuiDir_Left)) {
+        selected_run_ = std::nullopt;
+    }
+    ImGui::SameLine();
+    ImGui::TextUnformatted("Back to runs");
+    ImGui::Spacing();
+
     ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextBorderSize, 1.0F);
     ImGui::SeparatorText("Time per function");
     ImGui::PopStyleVar();
