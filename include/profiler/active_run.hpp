@@ -5,30 +5,36 @@
 #include <process/process.hpp>
 #include <profiler/completed_run.hpp>
 #include <profiler/run_overview.hpp>
+#include <profiler/sampling_data.hpp>
+#include <sampling/sampling_session.hpp>
 
 namespace hemlok::profiler {
 class ActiveRun {
 public:
+    // The session must already be attached to the process.
     static ActiveRun Create(RunId run, TargetId target,
-                            process::Process process);
+                            process::Process process,
+                            sampling::SamplingSession session);
     RunId GetRunId() const;
     TargetId GetTargetId() const;
     std::expected<bool, process::ProcessError> IsProcessRunning();
     std::expected<void, process::ProcessError> TerminateProcess();
-    // Placeholder until sampling is implemented.
-    std::expected<void, process::ProcessError> CollectSamples();
+    // Moves samples recorded since the previous call into the run's data.
+    void CollectSamples();
     RunOverview GetOverview() const;
-    // Consumes results; the worker removes this run after completion.
-    CompletedRun Complete(RunOutcome outcome,
-                          std::optional<process::ProcessError> error) &&;
+    // Stops sampling and consumes the results; the worker removes this run
+    // after completion.
+    CompletedRun Complete(RunOutcome outcome, std::optional<RunError> error) &&;
 
 private:
-    ActiveRun(RunId run, TargetId target, process::Process process);
+    ActiveRun(RunId run, TargetId target, process::Process process,
+              sampling::SamplingSession session);
     RunId run_id_;
     TargetId target_id_;
     process::Process process_;
     TimePoint start_time_;
-    SamplingResults sampling_results_;
+    sampling::SamplingSession session_;
+    SamplingData sampling_data_;
 };
 }  // namespace hemlok::profiler
 

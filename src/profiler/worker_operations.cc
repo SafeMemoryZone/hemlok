@@ -21,6 +21,37 @@ void FillCompletedRunOverviews(WorkerPublication& publication) {
     }
 }
 
+CompletedRun CompleteUnsampledRun(RunId run, TargetId target,
+                                  TimePoint start_time,
+                                  process::Process& process,
+                                  sampling::SamplingError error,
+                                  const LaunchedProcessQuery& query,
+                                  const LaunchedProcessTermination& terminate) {
+    CompletedRun completed_run{.run_id = run,
+                               .target_id = target,
+                               .outcome = RunOutcome::kFailed,
+                               .error = error,
+                               .start_time = start_time,
+                               .finish_time = {},
+                               .sampling_data = {}};
+    const auto process_status = query(process);
+    if (process_status.has_value() && !process_status.value()) {
+        // The process exited before sampling could attach. That is a natural
+        // finish without samples, not a sampling failure.
+        completed_run.outcome = RunOutcome::kFinished;
+        completed_run.error = std::nullopt;
+    } else {
+        const auto termination = terminate(process);
+        if (!termination.has_value()) {
+            // The process may still be running unsampled; report that
+            // instead of the sampling error.
+            completed_run.error = termination.error();
+        }
+    }
+    completed_run.finish_time = std::chrono::system_clock::now();
+    return completed_run;
+}
+
 void TerminateActiveRun(ActiveRunMap& active_runs,
                         PublicationChannel& publications, RunId id,
                         const ProcessStatusQuery& query,
@@ -116,7 +147,7 @@ void CompleteActiveRuns(ActiveRunMap& active_runs,
     for (auto& [id, run] : active_runs) {
         const auto termination = terminate(run);
         RunOutcome outcome = RunOutcome::kTerminated;
-        std::optional<process::ProcessError> error;
+        std::optional<RunError> error;
         if (!termination.has_value()) {
             // Cleanup could not terminate the process; retain the failure in
             // its result.

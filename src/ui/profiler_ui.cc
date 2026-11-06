@@ -10,6 +10,7 @@
 #include <string>
 #include <ui/profiler_ui.hpp>
 #include <ui/profiler_ui_logic.hpp>
+#include <variant>
 
 namespace hemlok::ui {
 
@@ -272,8 +273,12 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
         if (run.error) {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1.0F, 0.7F, 0.2F, 1.0F), "Error");
-            if (ImGui::IsItemHovered()) {
-                switch (*run.error) {
+            const auto* process_error =
+                std::get_if<process::ProcessError>(&*run.error);
+            const auto* sampling_error =
+                std::get_if<sampling::SamplingError>(&*run.error);
+            if (ImGui::IsItemHovered() && process_error != nullptr) {
+                switch (*process_error) {
                     case process::ProcessError::kFileNotFound:
                         ImGui::SetTooltip("Executable not found.");
                         break;
@@ -292,6 +297,26 @@ void ProfilerUi::DrawRuns(profiler::TargetId target) {
                     case process::ProcessError::kStatusQueryFailed:
                         ImGui::SetTooltip(
                             "Could not check process status. Retrying.");
+                        break;
+                }
+            }
+            if (ImGui::IsItemHovered() && sampling_error != nullptr) {
+                switch (*sampling_error) {
+                    case sampling::SamplingError::kProcessNotFound:
+                        ImGui::SetTooltip(
+                            "Could not find the process to sample.");
+                        break;
+                    case sampling::SamplingError::kPermissionDenied:
+                        ImGui::SetTooltip(
+                            "Sampling permission denied. Check "
+                            "kernel.perf_event_paranoid.");
+                        break;
+                    case sampling::SamplingError::kMultiThreaded:
+                        ImGui::SetTooltip(
+                            "Multi-threaded processes are not supported.");
+                        break;
+                    case sampling::SamplingError::kAttachFailed:
+                        ImGui::SetTooltip("Could not start sampling.");
                         break;
                 }
             }

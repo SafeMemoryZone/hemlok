@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <chrono>
 #include <profiler/worker_operations.hpp>
 #include <string>
 #include <unordered_map>
@@ -8,13 +9,18 @@ namespace {
 using namespace hemlok::profiler;
 using namespace hemlok::profiler::detail;
 using hemlok::process::ProcessError;
+using hemlok::sampling::SamplingError;
+using hemlok::sampling::SamplingSession;
 
 RunOverview AddRun(ActiveRunMap& runs, RunId id, TargetId target = 7) {
     auto process = hemlok::process::Process::CreateFromExecutable(
         HEMLOK_PROCESS_FIXTURE_PATH);
     REQUIRE(process);
+    auto session = SamplingSession::Attach(process->GetPid());
+    REQUIRE(session);
     auto [entry, inserted] =
-        runs.emplace(id, ActiveRun::Create(id, target, std::move(*process)));
+        runs.emplace(id, ActiveRun::Create(id, target, std::move(*process),
+                                           std::move(*session)));
     REQUIRE(inserted);
     return entry->second.GetOverview();
 }
@@ -22,7 +28,7 @@ RunOverview AddRun(ActiveRunMap& runs, RunId id, TargetId target = 7) {
 void CheckCompletion(const WorkerPublication& publication,
                      const RunOverview& initial, RunOutcome outcome,
                      RunStatus status,
-                     std::optional<ProcessError> error = std::nullopt) {
+                     std::optional<RunError> error = std::nullopt) {
     REQUIRE(publication.completed_runs.size() == 1);
     REQUIRE(publication.changed_overviews.size() == 1);
     const auto& completed = publication.completed_runs.front();
@@ -122,7 +128,7 @@ TEST_CASE("failed termination retains the run and permits a successful retry",
     REQUIRE(overview.start_time == initial.start_time);
     REQUIRE_FALSE(overview.finish_time);
     REQUIRE(overview.status == RunStatus::kRunning);
-    REQUIRE(overview.error == error);
+    REQUIRE(overview.error == RunError{error});
 
     TerminateActiveRun(runs, publications, 42, &ActiveRun::IsProcessRunning,
                        terminate);
@@ -168,7 +174,8 @@ TEST_CASE(
             REQUIRE(overview.status == RunStatus::kRunning);
             REQUIRE_FALSE(overview.finish_time);
             if (overview.run_id == 1) {
-                REQUIRE(overview.error == ProcessError::kStatusQueryFailed);
+                REQUIRE(overview.error ==
+                        RunError{ProcessError::kStatusQueryFailed});
                 REQUIRE(overview.start_time == first.start_time);
             } else {
                 REQUIRE_FALSE(overview.error);
@@ -237,5 +244,63 @@ TEST_CASE("shutdown retains cleanup errors and still completes other runs",
     }
     CompleteActiveRuns(runs, publications);
     REQUIRE(publications.TakeAll().empty());
+}
+
+TEST_CASE("an unsampled run that already exited is a natural finish",
+          "[profiler][worker]") {
+    auto process = hemlok::process::Process::CreateFromExecutable(
+        HEMLOK_PROCESS_FIXTURE_PATH);
+    REQUIRE(process);
+    const auto start_time = std::chrono::system_clock::now();
+    int terminations = 0;
+    const auto completed = CompleteUnsampledRun(
+        5, 6, start_time, *process, SamplingError::kProcessNotFound,
+        [](hemlok::process::Process&) -> std::expected<bool, ProcessError> {
+            return false;
+        },
+        [&](hemlok::process::Process&) -> std::expected<void, ProcessError> {
+            ++terminations;
+            return {};
+        });
+    REQUIRE(process->Terminate());
+    REQUIRE(terminations == 0);
+    REQUIRE(completed.run_id == 5);
+    REQUIRE(completed.target_id == 6);
+    REQUIRE(completed.outcome == RunOutcome::kFinished);
+    REQUIRE_FALSE(completed.error);
+    REQUIRE(completed.start_time == start_time);
+    REQUIRE(completed.finish_time >= start_time);
+    REQUIRE(completed.sampling_data.samples.empty());
+}
+
+TEST_CASE("an unsampled running process is terminated and the run fails",
+          "[profiler][worker]") {
+    auto process = hemlok::process::Process::CreateFromExecutable(
+        HEMLOK_PROCESS_FIXTURE_PATH);
+    REQUIRE(process);
+    const auto completed =
+        CompleteUnsampledRun(5, 6, std::chrono::system_clock::now(), *process,
+                             SamplingError::kMultiThreaded);
+    const auto running = process->IsRunning();
+    REQUIRE(running);
+    REQUIRE_FALSE(*running);
+    REQUIRE(completed.outcome == RunOutcome::kFailed);
+    REQUIRE(completed.error == RunError{SamplingError::kMultiThreaded});
+}
+
+TEST_CASE("a failed termination of an unsampled run reports the termination",
+          "[profiler][worker]") {
+    auto process = hemlok::process::Process::CreateFromExecutable(
+        HEMLOK_PROCESS_FIXTURE_PATH);
+    REQUIRE(process);
+    const auto completed = CompleteUnsampledRun(
+        5, 6, std::chrono::system_clock::now(), *process,
+        SamplingError::kPermissionDenied, &hemlok::process::Process::IsRunning,
+        [](hemlok::process::Process&) -> std::expected<void, ProcessError> {
+            return std::unexpected(ProcessError::kTerminationFailed);
+        });
+    REQUIRE(process->Terminate());
+    REQUIRE(completed.outcome == RunOutcome::kFailed);
+    REQUIRE(completed.error == RunError{ProcessError::kTerminationFailed});
 }
 }  // namespace

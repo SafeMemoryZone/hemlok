@@ -175,7 +175,9 @@ TEST_CASE("failed launches retain errors and consume run IDs", "[profiler]") {
     });
     const auto& completed = profiler.GetCompletedRun(*result);
     REQUIRE(completed.outcome == RunOutcome::kFailed);
-    REQUIRE(completed.error == hemlok::process::ProcessError::kFileNotFound);
+    REQUIRE(completed.error ==
+            hemlok::profiler::RunError{
+                hemlok::process::ProcessError::kFileNotFound});
     REQUIRE_FALSE(completed.start_time);
     const auto& overview = profiler.GetRunOverviews().at(*result);
     REQUIRE(overview.status == RunStatus::kFailed);
@@ -234,6 +236,26 @@ TEST_CASE("completed results can be copied out of their profiler",
     }
     REQUIRE(result->outcome == RunOutcome::kTerminated);
     REQUIRE(result->finish_time >= *result->start_time);
+}
+
+TEST_CASE("samples flow from an active run into its completed run",
+          "[profiler]") {
+    Profiler profiler;
+    const auto target = profiler.AddTarget(
+        MakeTarget("busy", HEMLOK_BUSY_PROCESS_FIXTURE_PATH));
+    const auto run = profiler.StartRun(target);
+    REQUIRE(run);
+    WaitFor(profiler, [&] {
+        return profiler.GetRunOverviews().at(*run).status ==
+               RunStatus::kRunning;
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds{100});
+    REQUIRE(profiler.TerminateRun(*run));
+    WaitFor(profiler,
+            [&] { return IsCompleted(profiler.GetRunOverviews().at(*run)); });
+    const auto& completed = profiler.GetCompletedRun(*run);
+    REQUIRE(completed.outcome == RunOutcome::kTerminated);
+    REQUIRE_FALSE(completed.sampling_data.samples.empty());
 }
 
 TEST_CASE("generated IDs continue across profiler instances", "[profiler]") {
